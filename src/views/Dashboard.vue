@@ -3,7 +3,7 @@
     <LayoutHeader />
     <div class="dashboard-content">
       <LayoutSidebar />
-      <div class="main-content">
+      <div class="main-content" :class="{ 'sidebar-collapsed': layoutStore.isSidebarCollapsed }">
         <div class="dashboard-header">
           <h1>交通监控控制台</h1>
           <div class="header-actions">
@@ -192,6 +192,7 @@ import { useRouter } from 'vue-router'
 import { useCameraStore } from '@/stores/camera'
 import { useVehicleStore } from '@/stores/vehicle'
 import { useMapStore } from '@/stores/map'
+import { useLayoutStore } from '@/stores/layout'
 import LayoutHeader from '@/components/Layout/Header.vue'
 import LayoutSidebar from '@/components/Layout/Sidebar.vue'
 import MapContainer from '@/components/Map/MapContainer.vue'
@@ -201,6 +202,7 @@ const router = useRouter()
 const cameraStore = useCameraStore()
 const vehicleStore = useVehicleStore()
 const mapStore = useMapStore()
+const layoutStore = useLayoutStore()
 
 // 计算属性
 const onlineCameraCount = computed(() => cameraStore.onlineCameras.length)
@@ -303,6 +305,11 @@ onMounted(() => {
   padding: 20px;
   overflow-y: auto;
   background: var(--bg-color);
+  transition: all 0.3s ease;
+}
+
+.main-content.sidebar-collapsed {
+  margin-left: 0;
 }
 
 .dashboard-header {

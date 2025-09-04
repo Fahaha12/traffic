@@ -1,5 +1,5 @@
 <template>
-  <div class="layout-sidebar">
+  <div class="layout-sidebar" :class="{ collapsed: isCollapsed }">
     <el-menu
       :default-active="activeMenu"
       class="sidebar-menu"
@@ -30,15 +30,15 @@
         </template>
         <el-menu-item index="/vehicles/list">
           <el-icon><List /></el-icon>
-          <span>车辆列表</span>
+          <template #title>车辆列表</template>
         </el-menu-item>
         <el-menu-item index="/vehicles/tracking">
           <el-icon><LocationInformation /></el-icon>
-          <span>轨迹追踪</span>
+          <template #title>轨迹追踪</template>
         </el-menu-item>
         <el-menu-item index="/vehicles/suspicious">
           <el-icon><Warning /></el-icon>
-          <span>可疑车辆</span>
+          <template #title>可疑车辆</template>
         </el-menu-item>
       </el-sub-menu>
       
@@ -59,43 +59,41 @@
         </template>
         <el-menu-item index="/system/users">
           <el-icon><User /></el-icon>
-          <span>用户管理</span>
+          <template #title>用户管理</template>
         </el-menu-item>
         <el-menu-item index="/system/logs">
           <el-icon><Document /></el-icon>
-          <span>系统日志</span>
+          <template #title>系统日志</template>
         </el-menu-item>
         <el-menu-item index="/system/config">
           <el-icon><Tools /></el-icon>
-          <span>系统配置</span>
+          <template #title>系统配置</template>
         </el-menu-item>
       </el-sub-menu>
+      
     </el-menu>
     
-    <div class="sidebar-footer">
-      <el-button 
-        type="text" 
-        @click="toggleCollapse"
-        class="collapse-btn"
-      >
-        <el-icon>
-          <Expand v-if="isCollapsed" />
-          <Fold v-else />
-        </el-icon>
-      </el-button>
+    <!-- 紧凑的折叠按钮 -->
+    <div class="sidebar-collapse-btn" @click="toggleCollapse">
+      <el-icon>
+        <Expand v-if="isCollapsed" />
+        <Fold v-else />
+      </el-icon>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { useLayoutStore } from '@/stores/layout'
 
 const route = useRoute()
 const userStore = useUserStore()
+const layoutStore = useLayoutStore()
 
-const isCollapsed = ref(false)
+const isCollapsed = computed(() => layoutStore.isSidebarCollapsed)
 
 // 计算属性
 const activeMenu = computed(() => {
@@ -115,7 +113,7 @@ const defaultOpeneds = computed(() => {
 
 // 方法
 const toggleCollapse = () => {
-  isCollapsed.value = !isCollapsed.value
+  layoutStore.toggleSidebar()
 }
 </script>
 
@@ -128,9 +126,16 @@ const toggleCollapse = () => {
   display: flex;
   flex-direction: column;
   transition: width 0.3s ease;
+  flex-shrink: 0;
+  position: relative;
+  padding-bottom: 32px;
 }
 
 .layout-sidebar.collapsed {
+  width: 64px;
+}
+
+.layout-sidebar.collapsed .sidebar-collapse-btn {
   width: 64px;
 }
 
@@ -140,19 +145,33 @@ const toggleCollapse = () => {
   background: transparent;
 }
 
-.sidebar-footer {
-  padding: 10px;
-  border-top: 1px solid var(--border-color);
-  text-align: center;
-}
-
-.collapse-btn {
+/* 折叠按钮 */
+.sidebar-collapse-btn {
+  position: absolute;
+  bottom: 0;
+  left: 0;
   width: 100%;
+  height: 32px;
+  background: var(--bg-color-light);
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
   color: var(--text-color-light);
+  font-size: 14px;
+  transition: all 0.3s ease;
+  z-index: 10;
+  box-sizing: border-box;
 }
 
-.collapse-btn:hover {
+.sidebar-collapse-btn:hover {
+  background: var(--border-color);
   color: var(--primary-color);
+}
+
+.sidebar-collapse-btn .el-icon {
+  font-size: 16px;
 }
 
 :deep(.el-menu) {
@@ -238,6 +257,17 @@ const toggleCollapse = () => {
   font-size: 16px;
   margin-right: 8px;
   color: inherit;
+  display: inline-block;
+}
+
+/* 确保子菜单项图标显示 */
+:deep(.el-sub-menu .el-menu-item) {
+  display: flex;
+  align-items: center;
+}
+
+:deep(.el-sub-menu .el-menu-item .el-icon) {
+  flex-shrink: 0;
 }
 
 /* 活跃状态的图标颜色 */
