@@ -1,0 +1,118 @@
+/* 全局样式 */
+:root {
+  --primary-color: #409eff;
+  --success-color: #67c23a;
+  --warning-color: #e6a23c;
+  --danger-color: #f56c6c;
+  --info-color: #909399;
+  
+  --bg-color: #0a0a0a;
+  --bg-color-light: #1a1a1a;
+  --text-color: #ffffff;
+  --text-color-light: #cccccc;
+  --border-color: #333333;
+  
+  --header-height: 60px;
+  --sidebar-width: 250px;
+}
+
+/* 暗色主题 */
+html.dark {
+  color-scheme: dark;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-color-light);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--info-color);
+}
+
+/* 地图容器样式 */
+.map-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+/* 视频播放器样式 */
+.video-js {
+  width: 100%;
+  height: 100%;
+}
+
+/* 车辆轨迹样式 */
+.vehicle-trajectory {
+  stroke: #ff6b6b;
+  stroke-width: 3;
+  fill: none;
+  stroke-dasharray: 5, 5;
+  animation: dash 1s linear infinite;
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: -10;
+  }
+}
+
+/* 可疑车辆高亮 */
+.suspicious-vehicle {
+  filter: drop-shadow(0 0 10px #ff6b6b);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* 摄像头标记样式 */
+.camera-marker {
+  background: var(--primary-color);
+  border: 2px solid white;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.camera-marker:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 15px var(--primary-color);
+}
+
+.camera-marker.offline {
+  background: var(--danger-color);
+}
+
+.camera-marker.online {
+  background: var(--success-color);
+}
+
+/* 响应式布局 */
+@media (max-width: 768px) {
+  :root {
+    --sidebar-width: 200px;
+  }
+}
