@@ -25,7 +25,7 @@
       
       <el-sub-menu index="vehicles">
         <template #title>
-          <el-icon><Truck /></el-icon>
+          <el-icon><Van /></el-icon>
           <span>车辆管理</span>
         </template>
         <el-menu-item index="/vehicles/list">
@@ -88,6 +88,7 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useLayoutStore } from '@/stores/layout'
+import { Van } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const userStore = useUserStore()

@@ -148,10 +148,19 @@ const handleVehicleClick = (vehicle: any) => {
   margin: 0;
 }
 
+.map-controls {
+  background: var(--bg-color-light);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
 .map-container-wrapper {
   height: calc(100vh - 140px);
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-color);
 }
 </style>

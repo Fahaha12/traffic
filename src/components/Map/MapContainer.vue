@@ -353,10 +353,12 @@ onUnmounted(() => {
   top: 10px;
   right: 10px;
   z-index: 1000;
-  background: white;
+  background: var(--bg-color);
+  color: var(--text-color);
   padding: 10px;
   border-radius: 4px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-color);
 }
 
 .map-legend {
@@ -364,10 +366,12 @@ onUnmounted(() => {
   bottom: 10px;
   left: 10px;
   z-index: 1000;
-  background: white;
+  background: var(--bg-color);
+  color: var(--text-color);
   padding: 10px;
   border-radius: 4px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-color);
 }
 
 .legend-item {
@@ -375,17 +379,23 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   margin-bottom: 5px;
+  color: var(--text-color);
 }
 
 .legend-item:last-child {
   margin-bottom: 0;
 }
 
+.legend-item span {
+  color: var(--text-color);
+  font-size: 12px;
+}
+
 .legend-color {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  border: 1px solid #ccc;
+  border: 1px solid var(--border-color);
 }
 
 .legend-color.online {
