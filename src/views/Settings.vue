@@ -319,8 +319,8 @@ const basicSettings = reactive({
 // 地图设置
 const mapSettings = reactive({
   provider: 'osm',
-  centerLat: '39.9042',
-  centerLng: '116.4074',
+  centerLat: '34.7466',
+  centerLng: '113.6253',
   defaultZoom: 12,
   showTraffic: false,
   showCoverage: true
@@ -391,8 +391,8 @@ const saveMapSettings = () => {
 const resetMapSettings = () => {
   Object.assign(mapSettings, {
     provider: 'osm',
-    centerLat: '39.9042',
-    centerLng: '116.4074',
+    centerLat: '34.7466',
+    centerLng: '113.6253',
     defaultZoom: 12,
     showTraffic: false,
     showCoverage: true

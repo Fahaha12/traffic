@@ -60,11 +60,83 @@ const router = createRouter({
       }
     },
     {
+      path: '/alerts',
+      name: 'AlertCenter',
+      component: () => import('@/views/AlertCenter.vue'),
+      meta: { 
+        title: '告警中心',
+        requiresAuth: true,
+        permissions: ['alerts:view']
+      }
+    },
+    {
       path: '/settings',
       name: 'Settings',
       component: () => import('@/views/Settings.vue'),
       meta: { 
         title: '系统设置',
+        requiresAuth: true,
+        permissions: ['system:manage']
+      }
+    },
+    // 车辆管理路由
+    {
+      path: '/vehicles/list',
+      name: 'VehicleList',
+      component: () => import('@/views/VehicleList.vue'),
+      meta: { 
+        title: '车辆列表',
+        requiresAuth: true,
+        permissions: ['vehicle:view']
+      }
+    },
+    {
+      path: '/vehicles/tracking',
+      name: 'VehicleTracking',
+      component: () => import('@/views/VehicleTracking.vue'),
+      meta: { 
+        title: '轨迹追踪',
+        requiresAuth: true,
+        permissions: ['vehicle:view']
+      }
+    },
+    {
+      path: '/vehicles/suspicious',
+      name: 'SuspiciousVehicles',
+      component: () => import('@/views/SuspiciousVehicles.vue'),
+      meta: { 
+        title: '可疑车辆',
+        requiresAuth: true,
+        permissions: ['vehicle:view']
+      }
+    },
+    // 系统管理路由
+    {
+      path: '/system/users',
+      name: 'SystemUsers',
+      component: () => import('@/views/SystemUsers.vue'),
+      meta: { 
+        title: '用户管理',
+        requiresAuth: true,
+        permissions: ['system:manage']
+      }
+    },
+    {
+      path: '/system/logs',
+      name: 'SystemLogs',
+      component: () => import('@/views/SystemLogs.vue'),
+      meta: { 
+        title: '系统日志',
+        requiresAuth: true,
+        permissions: ['system:manage']
+      }
+    },
+    {
+      path: '/system/config',
+      name: 'SystemConfig',
+      component: () => import('@/views/SystemConfig.vue'),
+      meta: { 
+        title: '系统配置',
         requiresAuth: true,
         permissions: ['system:manage']
       }

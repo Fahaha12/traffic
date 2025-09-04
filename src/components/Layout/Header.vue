@@ -74,7 +74,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { wsManager } from '@/api/websocket'
@@ -83,7 +83,7 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 
-const isDark = ref(true) // 默认暗色主题
+const isDark = ref(false) // 默认浅色主题
 
 // 计算属性
 const breadcrumbs = computed(() => {
@@ -128,6 +128,8 @@ const toggleTheme = () => {
   } else {
     html.classList.remove('dark')
   }
+  // 保存主题设置到localStorage
+  localStorage.setItem('theme', isDark.value ? 'dark' : 'light')
 }
 
 const handleUserCommand = (command: string) => {
@@ -144,6 +146,18 @@ const handleUserCommand = (command: string) => {
       break
   }
 }
+
+// 初始化主题
+onMounted(() => {
+  const savedTheme = localStorage.getItem('theme')
+  if (savedTheme === 'dark') {
+    isDark.value = true
+    document.documentElement.classList.add('dark')
+  } else {
+    isDark.value = false
+    document.documentElement.classList.remove('dark')
+  }
+})
 </script>
 
 <style scoped>

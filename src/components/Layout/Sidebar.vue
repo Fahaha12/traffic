@@ -5,6 +5,7 @@
       class="sidebar-menu"
       :collapse="isCollapsed"
       :unique-opened="true"
+      :default-openeds="defaultOpeneds"
       router
     >
       <el-menu-item index="/dashboard">
@@ -27,9 +28,18 @@
           <el-icon><Truck /></el-icon>
           <span>车辆管理</span>
         </template>
-        <el-menu-item index="/vehicles/list">车辆列表</el-menu-item>
-        <el-menu-item index="/vehicles/tracking">轨迹追踪</el-menu-item>
-        <el-menu-item index="/vehicles/suspicious">可疑车辆</el-menu-item>
+        <el-menu-item index="/vehicles/list">
+          <el-icon><List /></el-icon>
+          <span>车辆列表</span>
+        </el-menu-item>
+        <el-menu-item index="/vehicles/tracking">
+          <el-icon><LocationInformation /></el-icon>
+          <span>轨迹追踪</span>
+        </el-menu-item>
+        <el-menu-item index="/vehicles/suspicious">
+          <el-icon><Warning /></el-icon>
+          <span>可疑车辆</span>
+        </el-menu-item>
       </el-sub-menu>
       
       <el-menu-item index="/analytics">
@@ -47,9 +57,18 @@
           <el-icon><Setting /></el-icon>
           <span>系统管理</span>
         </template>
-        <el-menu-item index="/system/users">用户管理</el-menu-item>
-        <el-menu-item index="/system/logs">系统日志</el-menu-item>
-        <el-menu-item index="/system/config">系统配置</el-menu-item>
+        <el-menu-item index="/system/users">
+          <el-icon><User /></el-icon>
+          <span>用户管理</span>
+        </el-menu-item>
+        <el-menu-item index="/system/logs">
+          <el-icon><Document /></el-icon>
+          <span>系统日志</span>
+        </el-menu-item>
+        <el-menu-item index="/system/config">
+          <el-icon><Tools /></el-icon>
+          <span>系统配置</span>
+        </el-menu-item>
       </el-sub-menu>
     </el-menu>
     
@@ -81,6 +100,17 @@ const isCollapsed = ref(false)
 // 计算属性
 const activeMenu = computed(() => {
   return route.path
+})
+
+// 默认展开的菜单项
+const defaultOpeneds = computed(() => {
+  const path = route.path
+  if (path.startsWith('/vehicles/')) {
+    return ['vehicles']
+  } else if (path.startsWith('/system/')) {
+    return ['system']
+  }
+  return []
 })
 
 // 方法
@@ -157,6 +187,7 @@ const toggleCollapse = () => {
 :deep(.el-sub-menu .el-menu-item) {
   background: var(--bg-color);
   padding-left: 50px;
+  transition: all 0.2s ease;
 }
 
 :deep(.el-sub-menu .el-menu-item:hover) {
@@ -168,6 +199,15 @@ const toggleCollapse = () => {
   color: white;
 }
 
+:deep(.el-sub-menu .el-menu-item .el-icon) {
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+:deep(.el-sub-menu .el-menu-item span) {
+  font-size: 14px;
+}
+
 :deep(.el-menu--collapse .el-menu-item span),
 :deep(.el-menu--collapse .el-sub-menu__title span) {
   display: none;
@@ -175,5 +215,34 @@ const toggleCollapse = () => {
 
 :deep(.el-menu--collapse .el-sub-menu .el-menu-item) {
   padding-left: 20px;
+}
+
+/* 优化子菜单展开动效 */
+:deep(.el-sub-menu .el-menu) {
+  transition: all 0.3s ease;
+}
+
+:deep(.el-sub-menu .el-menu-item) {
+  transition: all 0.2s ease;
+}
+
+/* 确保图标正确显示 */
+:deep(.el-menu-item .el-icon),
+:deep(.el-sub-menu__title .el-icon) {
+  font-size: 18px;
+  margin-right: 8px;
+}
+
+/* 子菜单项图标样式 */
+:deep(.el-sub-menu .el-menu-item .el-icon) {
+  font-size: 16px;
+  margin-right: 8px;
+  color: inherit;
+}
+
+/* 活跃状态的图标颜色 */
+:deep(.el-menu-item.is-active .el-icon),
+:deep(.el-sub-menu .el-menu-item.is-active .el-icon) {
+  color: white;
 }
 </style>

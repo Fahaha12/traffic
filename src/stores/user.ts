@@ -247,14 +247,18 @@ export const useUserStore = defineStore('user', () => {
       phone: '13800138000',
       avatar: '',
       roles: ['admin'],
-      permissions: [
-        'dashboard:view',
-        'map:view',
-        'camera:view',
-        'camera:manage',
-        'analytics:view',
-        'system:manage'
-      ],
+                   permissions: [
+               'dashboard:view',
+               'map:view',
+               'camera:view',
+               'camera:manage',
+               'vehicle:view',
+               'vehicle:manage',
+               'analytics:view',
+               'alerts:view',
+               'alerts:manage',
+               'system:manage'
+             ],
       department: '技术部',
       position: '系统管理员',
       lastLoginTime: new Date().toISOString(),
