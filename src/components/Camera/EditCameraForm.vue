@@ -80,6 +80,7 @@
 <script setup lang="ts">
 import { ref, reactive, watch } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { useCameraStore } from '@/stores/camera'
 import type { Camera } from '@/types'
 
 interface Props {
@@ -95,6 +96,7 @@ const emit = defineEmits<{
 
 const formRef = ref<FormInstance>()
 const loading = ref(false)
+const cameraStore = useCameraStore()
 
 const form = reactive({
   name: '',
@@ -157,11 +159,31 @@ const handleSubmit = async () => {
     await formRef.value.validate()
     loading.value = true
     
-    // 这里调用API更新摄像头
-    // await cameraApi.updateCamera(props.camera.id, form)
+    // 创建更新后的摄像头对象
+    const updatedCamera: Camera = {
+      ...props.camera,
+      name: form.name,
+      type: form.type as Camera['type'],
+      position: {
+        lat: parseFloat(form.lat),
+        lng: parseFloat(form.lng)
+      },
+      streamUrl: form.streamUrl,
+      streamType: form.streamType as Camera['streamType'],
+      resolution: {
+        width: form.width,
+        height: form.height
+      },
+      fps: form.fps,
+      direction: form.direction,
+      lastUpdate: new Date().toISOString()
+    }
     
-    // 模拟API调用
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    // 更新store中的摄像头数据
+    await cameraStore.updateCamera(updatedCamera)
+    
+    // 模拟API调用延迟
+    await new Promise(resolve => setTimeout(resolve, 500))
     
     ElMessage.success('摄像头更新成功')
     emit('success')

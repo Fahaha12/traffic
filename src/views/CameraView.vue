@@ -15,6 +15,10 @@
               <el-icon><Refresh /></el-icon>
               刷新
             </el-button>
+            <el-button @click="checkAllStatus" :loading="isCheckingStatus">
+              <el-icon><Connection /></el-icon>
+              检测状态
+            </el-button>
           </div>
         </div>
         
@@ -201,7 +205,9 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useCameraStore } from '@/stores/camera'
+import { testStreamConnection } from '@/utils/streamUtils'
 import LayoutHeader from '@/components/Layout/Header.vue'
 import LayoutSidebar from '@/components/Layout/Sidebar.vue'
 import VideoPlayer from '@/components/Video/VideoPlayer.vue'
@@ -216,6 +222,7 @@ const selectedCamera = ref<Camera | null>(null)
 const editingCamera = ref<Camera | null>(null)
 const showAddCameraDialog = ref(false)
 const showEditCameraDialog = ref(false)
+const isCheckingStatus = ref(false)
 
 const filteredCameras = computed(() => {
   if (!searchKeyword.value) {
@@ -243,12 +250,30 @@ const editCamera = (camera: Camera) => {
 
 const deleteCamera = async (camera: Camera) => {
   try {
+    // 显示确认对话框
+    await ElMessageBox.confirm(
+      `确定要删除摄像头 "${camera.name}" 吗？此操作不可撤销。`,
+      '删除确认',
+      {
+        confirmButtonText: '确定删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+        confirmButtonClass: 'el-button--danger'
+      }
+    )
+    
     await cameraStore.removeCamera(camera.id)
     if (selectedCamera.value?.id === camera.id) {
       selectedCamera.value = null
     }
+    ElMessage.success('摄像头删除成功')
   } catch (error) {
-    console.error('删除摄像头失败:', error)
+    if (error === 'cancel') {
+      ElMessage.info('已取消删除')
+    } else {
+      console.error('删除摄像头失败:', error)
+      ElMessage.error('删除摄像头失败')
+    }
   }
 }
 
@@ -262,10 +287,27 @@ const stopStream = (cameraId: string) => {
 
 const testConnection = async (cameraId: string) => {
   try {
-    // 这里调用测试连接的API
-    console.log('测试摄像头连接:', cameraId)
+    const camera = cameraStore.cameras.find(c => c.id === cameraId)
+    if (!camera) {
+      ElMessage.error('摄像头不存在')
+      return
+    }
+    
+    ElMessage.info('正在测试摄像头连接...')
+    
+    // 使用流媒体工具进行连接测试
+    const result = await testStreamConnection(camera.streamUrl)
+    
+    if (result.success) {
+      ElMessage.success(result.message)
+      cameraStore.updateCameraStatus(cameraId, 'online')
+    } else {
+      ElMessage.error(result.message)
+      cameraStore.updateCameraStatus(cameraId, 'offline')
+    }
   } catch (error) {
     console.error('测试连接失败:', error)
+    ElMessage.error('测试连接失败')
   }
 }
 
@@ -283,6 +325,19 @@ const refreshCameras = async () => {
     await cameraStore.refreshCameraData()
   } catch (error) {
     console.error('刷新摄像头数据失败:', error)
+  }
+}
+
+const checkAllStatus = async () => {
+  try {
+    isCheckingStatus.value = true
+    await cameraStore.checkAllCameraStatus()
+    ElMessage.success('状态检测完成')
+  } catch (error) {
+    console.error('状态检测失败:', error)
+    ElMessage.error('状态检测失败')
+  } finally {
+    isCheckingStatus.value = false
   }
 }
 
@@ -324,8 +379,9 @@ const getStatusType = (status: string) => {
   }
 }
 
-onMounted(() => {
-  refreshCameras()
+onMounted(async () => {
+  // 清除本地存储并重新从云端加载数据
+  await cameraStore.clearLocalStorageAndRefresh()
 })
 </script>
 

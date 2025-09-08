@@ -11,7 +11,7 @@
           重置视图
         </el-button>
         <el-button @click="toggleTraffic" size="small" :type="showTraffic ? 'primary' : 'default'">
-          <el-icon><Road /></el-icon>
+          <el-icon><Location /></el-icon>
           交通状况
         </el-button>
       </el-button-group>
@@ -36,6 +36,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { FullScreen, Refresh, Location } from '@element-plus/icons-vue'
 import L from 'leaflet'
 import { useMapStore } from '@/stores/map'
 import { useCameraStore } from '@/stores/camera'

@@ -80,6 +80,8 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { useCameraStore } from '@/stores/camera'
+import type { Camera } from '@/types'
 
 const emit = defineEmits<{
   success: []
@@ -88,6 +90,7 @@ const emit = defineEmits<{
 
 const formRef = ref<FormInstance>()
 const loading = ref(false)
+const cameraStore = useCameraStore()
 
 const form = reactive({
   name: '',
@@ -132,11 +135,32 @@ const handleSubmit = async () => {
     await formRef.value.validate()
     loading.value = true
     
-    // 这里调用API添加摄像头
-    // await cameraApi.addCamera(form)
+    // 创建摄像头对象
+    const newCamera: Camera = {
+      id: `camera_${Date.now()}`, // 生成唯一ID
+      name: form.name,
+      type: form.type as Camera['type'],
+      position: {
+        lat: parseFloat(form.lat),
+        lng: parseFloat(form.lng)
+      },
+      streamUrl: form.streamUrl,
+      streamType: form.streamType as Camera['streamType'],
+      resolution: {
+        width: form.width,
+        height: form.height
+      },
+      fps: form.fps,
+      direction: form.direction,
+      status: 'offline', // 新添加的摄像头默认为离线状态
+      lastUpdate: new Date().toISOString()
+    }
     
-    // 模拟API调用
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    // 添加到store
+    cameraStore.addCamera(newCamera)
+    
+    // 模拟API调用延迟
+    await new Promise(resolve => setTimeout(resolve, 500))
     
     ElMessage.success('摄像头添加成功')
     emit('success')

@@ -1,0 +1,106 @@
+{
+  "cleanup_settings": {
+    "enabled": true,
+    "base_directory": ".",
+    "log_file": "cleanup.log",
+    "max_log_size_mb": 10,
+    "backup_logs": 5
+  },
+  "directories": {
+    "streams": {
+      "path": "streams",
+      "enabled": true,
+      "max_age_hours": 2,
+      "extensions": [".m3u8", ".ts", ".mp4", ".avi", ".mov"],
+      "description": "HLS流媒体文件"
+    },
+    "temp": {
+      "path": "temp",
+      "enabled": true,
+      "max_age_hours": 1,
+      "extensions": [".tmp", ".temp", ".log"],
+      "description": "临时文件"
+    },
+    "uploads": {
+      "path": "uploads",
+      "enabled": true,
+      "max_age_hours": 24,
+      "extensions": [".mp4", ".avi", ".mov", ".mkv", ".flv"],
+      "description": "上传文件"
+    },
+    "logs": {
+      "path": "logs",
+      "enabled": true,
+      "max_age_hours": 168,
+      "extensions": [".log"],
+      "description": "日志文件"
+    },
+    "cache": {
+      "path": "cache",
+      "enabled": true,
+      "max_age_hours": 12,
+      "extensions": [".cache", ".tmp"],
+      "description": "缓存文件"
+    }
+  },
+  "schedules": {
+    "quick_cleanup": {
+      "interval_minutes": 30,
+      "enabled": true,
+      "description": "快速清理（每30分钟）"
+    },
+    "daily_cleanup": {
+      "time": "02:00",
+      "enabled": true,
+      "description": "每日深度清理（凌晨2点）"
+    },
+    "weekly_cleanup": {
+      "day": "sunday",
+      "time": "03:00",
+      "enabled": true,
+      "description": "每周完整清理（周日凌晨3点）"
+    }
+  },
+  "safety_settings": {
+    "dry_run": false,
+    "confirm_deletion": false,
+    "max_file_size_mb": 1000,
+    "exclude_patterns": [
+      "*.config",
+      "*.conf",
+      "*.ini",
+      "*.json",
+      "*.xml",
+      "*.yaml",
+      "*.yml"
+    ],
+    "include_patterns": [
+      "*.m3u8",
+      "*.ts",
+      "*.mp4",
+      "*.avi",
+      "*.mov",
+      "*.mkv",
+      "*.flv",
+      "*.tmp",
+      "*.temp",
+      "*.log"
+    ]
+  },
+  "notifications": {
+    "enabled": true,
+    "email": {
+      "enabled": false,
+      "smtp_server": "",
+      "smtp_port": 587,
+      "username": "",
+      "password": "",
+      "to_addresses": []
+    },
+    "webhook": {
+      "enabled": false,
+      "url": "",
+      "headers": {}
+    }
+  }
+}

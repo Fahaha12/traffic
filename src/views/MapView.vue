@@ -13,7 +13,7 @@
                 适应摄像头
               </el-button>
               <el-button @click="toggleTrafficLayer" size="small" :type="showTraffic ? 'primary' : 'default'">
-                <el-icon><Road /></el-icon>
+                <el-icon><Location /></el-icon>
                 交通状况
               </el-button>
               <el-button @click="toggleVehicleTracking" size="small" :type="isTracking ? 'primary' : 'default'">
@@ -67,7 +67,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { FullScreen, Location } from '@element-plus/icons-vue'
 import { useMapStore } from '@/stores/map'
 import { useCameraStore } from '@/stores/camera'
 import { useVehicleStore } from '@/stores/vehicle'
@@ -114,6 +115,12 @@ const handleCameraClick = (camera: CameraPosition) => {
 const handleVehicleClick = (vehicle: any) => {
   showVehiclePanel.value = true
 }
+
+// 页面初始化
+onMounted(() => {
+  // 加载摄像头数据
+  cameraStore.loadCamerasFromStorage()
+})
 </script>
 
 <style scoped>

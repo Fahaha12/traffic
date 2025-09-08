@@ -283,6 +283,9 @@ const formatTime = (timestamp: string) => {
 }
 
 onMounted(() => {
+  // 首先加载摄像头数据
+  cameraStore.loadCamerasFromStorage()
+  // 然后刷新数据
   refreshData()
 })
 </script>

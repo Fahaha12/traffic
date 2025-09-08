@@ -71,9 +71,11 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useCameraStore } from '@/stores/camera'
 import VideoPlayer from '@/components/Video/VideoPlayer.vue'
 import { dateUtils } from '@/utils/dateUtils'
+import { testStreamConnection } from '@/utils/streamUtils'
 import type { CameraPosition } from '@/types'
 
 interface Props {
@@ -133,8 +135,24 @@ const stopStream = () => {
   cameraStore.stopStream(props.camera.id)
 }
 
-const testConnection = () => {
-  console.log('测试摄像头连接:', props.camera.id)
+const testConnection = async () => {
+  try {
+    ElMessage.info('正在测试摄像头连接...')
+    
+    // 使用流媒体工具进行连接测试
+    const result = await testStreamConnection(props.camera.streamUrl)
+    
+    if (result.success) {
+      ElMessage.success(result.message)
+      cameraStore.updateCameraStatus(props.camera.id, 'online')
+    } else {
+      ElMessage.error(result.message)
+      cameraStore.updateCameraStatus(props.camera.id, 'offline')
+    }
+  } catch (error) {
+    console.error('测试连接失败:', error)
+    ElMessage.error('测试连接失败')
+  }
 }
 </script>
 
