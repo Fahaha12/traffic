@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-定时清理临时文件脚本
+定时清理临时文件服务
 用于清理HLS流文件、视频临时文件等
 """
 
@@ -10,18 +10,7 @@ import shutil
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-import schedule
-import threading
 
-# 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('cleanup.log'),
-        logging.StreamHandler()
-    ]
-)
 logger = logging.getLogger(__name__)
 
 class TempFileCleaner:
@@ -121,6 +110,10 @@ class TempFileCleaner:
         if cleaned_count > 0:
             logger.info(f"清理完成: 删除 {cleaned_count} 个空目录")
     
+    def cleanup_files(self):
+        """执行文件清理（兼容性方法）"""
+        return self.cleanup_all()
+    
     def cleanup_all(self):
         """执行完整清理"""
         logger.info("开始执行定时清理任务...")
@@ -139,6 +132,11 @@ class TempFileCleaner:
         
         end_time = time.time()
         logger.info(f"定时清理任务完成，耗时: {end_time - start_time:.2f} 秒")
+        return {
+            'success': True,
+            'duration': end_time - start_time,
+            'message': '清理任务执行完成'
+        }
     
     def cleanup_system_temp(self):
         """清理系统临时文件"""
@@ -197,55 +195,3 @@ class TempFileCleaner:
             size_mb = info['size'] / (1024 * 1024)
             logger.info(f"{name}: {info['files']} 个文件, {size_mb:.2f} MB")
         logger.info("========================")
-
-def run_cleanup():
-    """运行清理任务"""
-    cleaner = TempFileCleaner()
-    cleaner.cleanup_all()
-    cleaner.print_usage_report()
-
-def run_cleanup_scheduler():
-    """运行定时清理调度器"""
-    logger.info("启动定时清理调度器...")
-    
-    # 每30分钟执行一次清理
-    schedule.every(30).minutes.do(run_cleanup)
-    
-    # 每天凌晨2点执行深度清理
-    schedule.every().day.at("02:00").do(run_cleanup)
-    
-    # 每周日凌晨3点执行完整清理
-    schedule.every().sunday.at("03:00").do(lambda: TempFileCleaner().cleanup_all())
-    
-    while True:
-        schedule.run_pending()
-        time.sleep(60)  # 每分钟检查一次
-
-def main():
-    """主函数"""
-    import argparse
-    
-    parser = argparse.ArgumentParser(description='临时文件清理工具')
-    parser.add_argument('--once', action='store_true', help='执行一次清理后退出')
-    parser.add_argument('--daemon', action='store_true', help='以守护进程模式运行')
-    parser.add_argument('--report', action='store_true', help='显示使用情况报告')
-    parser.add_argument('--base-dir', default='.', help='基础目录路径')
-    
-    args = parser.parse_args()
-    
-    cleaner = TempFileCleaner(args.base_dir)
-    
-    if args.report:
-        cleaner.print_usage_report()
-        return
-    
-    if args.once:
-        run_cleanup()
-    elif args.daemon:
-        run_cleanup_scheduler()
-    else:
-        # 默认执行一次清理
-        run_cleanup()
-
-if __name__ == '__main__':
-    main()
