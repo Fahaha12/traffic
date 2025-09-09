@@ -145,12 +145,12 @@ class Vehicle(db.Model):
     
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     plate_number = db.Column(db.String(20), nullable=False)
-    vehicle_type = db.Column(db.Enum('car', 'truck', 'bus', 'motorcycle', 'bicycle', 'unknown'), nullable=False)
+    vehicle_type = db.Column(db.String(20), nullable=False)
     color = db.Column(db.String(20))
     brand = db.Column(db.String(50))
     model = db.Column(db.String(50))
     is_suspicious = db.Column(db.Boolean, default=False)
-    risk_level = db.Column(db.Enum('low', 'medium', 'high', 'critical'), default='low')
+    risk_level = db.Column(db.String(20), default='low')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     def to_dict(self):
@@ -171,38 +171,61 @@ class VehicleDetection(db.Model):
     __tablename__ = 'vehicle_detections'
     
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    vehicle_id = db.Column(db.String(36), db.ForeignKey('vehicles.id'), nullable=False)
     camera_id = db.Column(db.String(36), nullable=False)
-    detection_time = db.Column(db.DateTime, nullable=False)
-    bbox_x1 = db.Column(db.Float, nullable=False)
-    bbox_y1 = db.Column(db.Float, nullable=False)
-    bbox_x2 = db.Column(db.Float, nullable=False)
-    bbox_y2 = db.Column(db.Float, nullable=False)
-    confidence = db.Column(db.Float, nullable=False)
-    vehicle_type = db.Column(db.Enum('car', 'truck', 'bus', 'motorcycle', 'bicycle', 'unknown'), nullable=False)
-    color = db.Column(db.String(20))
-    speed = db.Column(db.Float)
-    direction = db.Column(db.Float)
-    image_path = db.Column(db.String(500))
+    detected_at = db.Column(db.DateTime, nullable=False)
+    latitude = db.Column(db.Float, nullable=False)
+    longitude = db.Column(db.Float, nullable=False)
+    confidence = db.Column(db.Float, default=0.9)
+    speed = db.Column(db.Float, default=0)
+    direction = db.Column(db.Float, default=0)
+    image_url = db.Column(db.String(500))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     def to_dict(self):
         return {
             'id': self.id,
+            'vehicleId': self.vehicle_id,
             'cameraId': self.camera_id,
-            'detectionTime': self.detection_time.isoformat(),
-            'bbox': {
-                'x1': self.bbox_x1,
-                'y1': self.bbox_y1,
-                'x2': self.bbox_x2,
-                'y2': self.bbox_y2
-            },
+            'detectedAt': self.detected_at.isoformat(),
+            'latitude': self.latitude,
+            'longitude': self.longitude,
             'confidence': self.confidence,
-            'vehicleType': self.vehicle_type,
-            'color': self.color,
             'speed': self.speed,
             'direction': self.direction,
-            'imagePath': self.image_path,
+            'imageUrl': self.image_url,
             'createdAt': self.created_at.isoformat()
+        }
+
+# 车辆告警模型
+class VehicleAlert(db.Model):
+    __tablename__ = 'vehicle_alerts'
+    
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    vehicle_id = db.Column(db.String(36), db.ForeignKey('vehicles.id'), nullable=False)
+    alert_type = db.Column(db.String(50), nullable=False)  # suspicious, speed, location, etc.
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text)
+    severity = db.Column(db.String(20), default='medium')  # low, medium, high, critical
+    is_read = db.Column(db.Boolean, default=False)
+    is_resolved = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    read_at = db.Column(db.DateTime)
+    resolved_at = db.Column(db.DateTime)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'vehicleId': self.vehicle_id,
+            'alertType': self.alert_type,
+            'title': self.title,
+            'description': self.description,
+            'severity': self.severity,
+            'isRead': self.is_read,
+            'isResolved': self.is_resolved,
+            'createdAt': self.created_at.isoformat(),
+            'readAt': self.read_at.isoformat() if self.read_at else None,
+            'resolvedAt': self.resolved_at.isoformat() if self.resolved_at else None
         }
 
 # 健康检查
@@ -511,37 +534,6 @@ def delete_camera(camera_id):
         logger.error(f'删除摄像头失败: {str(e)}')
         return jsonify({'error': '删除摄像头失败'}), 500
 
-@app.route('/api/cameras/<camera_id>/test-connection', methods=['POST'])
-def test_connection(camera_id):
-    try:
-        camera = Camera.query.get(camera_id)
-        if not camera:
-            return jsonify({'error': '摄像头不存在'}), 404
-        
-        # 模拟连接测试
-        import random
-        is_online = random.choice([True, True, True, False])  # 75%成功率
-        
-        if is_online:
-            camera.status = 'online'
-            message = '连接测试成功'
-        else:
-            camera.status = 'offline'
-            message = '连接测试失败'
-        
-        camera.updated_at = datetime.utcnow()
-        db.session.commit()
-        
-        return jsonify({
-            'success': is_online,
-            'message': message,
-            'camera': camera.to_dict()
-        }), 200
-        
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f'测试连接失败: {str(e)}')
-        return jsonify({'error': '测试连接失败'}), 500
 
 @app.route('/api/system/cleanup', methods=['POST'])
 def manual_cleanup():
@@ -585,6 +577,8 @@ def cleanup_status():
         logger.error(f'获取清理状态失败: {str(e)}')
         return jsonify({'error': '获取清理状态失败'}), 500
 
+
+
 # 车辆API
 @app.route('/api/vehicles', methods=['GET'])
 def get_vehicles():
@@ -593,6 +587,8 @@ def get_vehicles():
         per_page = request.args.get('per_page', 20, type=int)
         vehicle_type = request.args.get('type')
         is_suspicious = request.args.get('is_suspicious')
+        risk_level = request.args.get('risk_level')
+        search = request.args.get('search')
         
         query = Vehicle.query
         
@@ -600,6 +596,16 @@ def get_vehicles():
             query = query.filter_by(vehicle_type=vehicle_type)
         if is_suspicious is not None:
             query = query.filter_by(is_suspicious=is_suspicious.lower() == 'true')
+        if risk_level:
+            query = query.filter_by(risk_level=risk_level)
+        if search:
+            query = query.filter(
+                db.or_(
+                    Vehicle.plate_number.contains(search),
+                    Vehicle.brand.contains(search),
+                    Vehicle.model.contains(search)
+                )
+            )
         
         vehicles = query.paginate(
             page=page,
@@ -617,6 +623,305 @@ def get_vehicles():
     except Exception as e:
         logger.error(f'获取车辆列表失败: {str(e)}')
         return jsonify({'error': '获取车辆列表失败'}), 500
+
+@app.route('/api/vehicles/<vehicle_id>', methods=['GET'])
+def get_vehicle(vehicle_id):
+    try:
+        vehicle = Vehicle.query.get(vehicle_id)
+        if not vehicle:
+            return jsonify({'error': '车辆不存在'}), 404
+        
+        return jsonify(vehicle.to_dict()), 200
+    except Exception as e:
+        logger.error(f'获取车辆信息失败: {str(e)}')
+        return jsonify({'error': '获取车辆信息失败'}), 500
+
+@app.route('/api/vehicles', methods=['POST'])
+def create_vehicle():
+    try:
+        data = request.get_json()
+        
+        # 验证必填字段
+        if not data.get('plateNumber'):
+            return jsonify({'error': '车牌号不能为空'}), 400
+        
+        # 检查车牌号是否已存在
+        existing_vehicle = Vehicle.query.filter_by(plate_number=data['plateNumber']).first()
+        if existing_vehicle:
+            return jsonify({'error': '车牌号已存在'}), 400
+        
+        # 创建车辆
+        vehicle = Vehicle(
+            plate_number=data['plateNumber'],
+            vehicle_type=data.get('vehicleType', 'car'),
+            color=data.get('color'),
+            brand=data.get('brand'),
+            model=data.get('model'),
+            is_suspicious=data.get('isSuspicious', False),
+            risk_level=data.get('riskLevel', 'low')
+        )
+        
+        db.session.add(vehicle)
+        db.session.commit()
+        
+        return jsonify(vehicle.to_dict()), 201
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'创建车辆失败: {str(e)}')
+        logger.error(f'错误详情: {repr(e)}')
+        return jsonify({'error': f'创建车辆失败: {str(e)}'}), 500
+
+@app.route('/api/vehicles/<vehicle_id>', methods=['PUT'])
+def update_vehicle(vehicle_id):
+    try:
+        vehicle = Vehicle.query.get(vehicle_id)
+        if not vehicle:
+            return jsonify({'error': '车辆不存在'}), 404
+        
+        data = request.get_json()
+        
+        # 更新车辆信息
+        if 'plateNumber' in data:
+            # 检查车牌号是否已被其他车辆使用
+            existing_vehicle = Vehicle.query.filter(
+                Vehicle.plate_number == data['plateNumber'],
+                Vehicle.id != vehicle_id
+            ).first()
+            if existing_vehicle:
+                return jsonify({'error': '车牌号已被其他车辆使用'}), 400
+            vehicle.plate_number = data['plateNumber']
+        
+        if 'vehicleType' in data:
+            vehicle.vehicle_type = data['vehicleType']
+        if 'color' in data:
+            vehicle.color = data['color']
+        if 'brand' in data:
+            vehicle.brand = data['brand']
+        if 'model' in data:
+            vehicle.model = data['model']
+        if 'year' in data:
+            vehicle.year = data['year']
+        if 'isSuspicious' in data:
+            vehicle.is_suspicious = data['isSuspicious']
+        if 'riskLevel' in data:
+            vehicle.risk_level = data['riskLevel']
+        
+        vehicle.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        return jsonify(vehicle.to_dict()), 200
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'更新车辆失败: {str(e)}')
+        return jsonify({'error': '更新车辆失败'}), 500
+
+@app.route('/api/vehicles/<vehicle_id>', methods=['DELETE'])
+def delete_vehicle(vehicle_id):
+    try:
+        vehicle = Vehicle.query.get(vehicle_id)
+        if not vehicle:
+            return jsonify({'error': '车辆不存在'}), 404
+        
+        db.session.delete(vehicle)
+        db.session.commit()
+        
+        return jsonify({'message': '车辆删除成功'}), 200
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'删除车辆失败: {str(e)}')
+        return jsonify({'error': '删除车辆失败'}), 500
+
+@app.route('/api/vehicles/suspicious', methods=['GET'])
+def get_suspicious_vehicles():
+    try:
+        vehicles = Vehicle.query.filter_by(is_suspicious=True).all()
+        return jsonify([vehicle.to_dict() for vehicle in vehicles]), 200
+    except Exception as e:
+        logger.error(f'获取可疑车辆失败: {str(e)}')
+        return jsonify({'error': '获取可疑车辆失败'}), 500
+
+@app.route('/api/vehicles/<vehicle_id>/mark-suspicious', methods=['POST'])
+def mark_vehicle_suspicious(vehicle_id):
+    try:
+        vehicle = Vehicle.query.get(vehicle_id)
+        if not vehicle:
+            return jsonify({'error': '车辆不存在'}), 404
+        
+        data = request.get_json()
+        vehicle.is_suspicious = data.get('isSuspicious', True)
+        vehicle.risk_level = data.get('riskLevel', 'medium')
+        vehicle.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        return jsonify(vehicle.to_dict()), 200
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'标记可疑车辆失败: {str(e)}')
+        return jsonify({'error': '标记可疑车辆失败'}), 500
+
+@app.route('/api/vehicles/stats', methods=['GET'])
+def get_vehicle_stats():
+    try:
+        total_vehicles = Vehicle.query.count()
+        suspicious_vehicles = Vehicle.query.filter_by(is_suspicious=True).count()
+        
+        # 按类型统计
+        type_stats = db.session.query(
+            Vehicle.vehicle_type,
+            db.func.count(Vehicle.id)
+        ).group_by(Vehicle.vehicle_type).all()
+        
+        # 按风险等级统计
+        risk_stats = db.session.query(
+            Vehicle.risk_level,
+            db.func.count(Vehicle.id)
+        ).group_by(Vehicle.risk_level).all()
+        
+        return jsonify({
+            'total': total_vehicles,
+            'suspicious': suspicious_vehicles,
+            'normal': total_vehicles - suspicious_vehicles,
+            'byType': dict(type_stats),
+            'byRiskLevel': dict(risk_stats)
+        }), 200
+    except Exception as e:
+        logger.error(f'获取车辆统计失败: {str(e)}')
+        return jsonify({'error': '获取车辆统计失败'}), 500
+
+@app.route('/api/vehicles/<vehicle_id>/tracks', methods=['GET'])
+def get_vehicle_tracks(vehicle_id):
+    """获取车辆轨迹"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
+        start_time = request.args.get('start_time')
+        end_time = request.args.get('end_time')
+        
+        query = VehicleDetection.query.filter_by(vehicle_id=vehicle_id)
+        
+        if start_time:
+            query = query.filter(VehicleDetection.detected_at >= datetime.fromisoformat(start_time))
+        if end_time:
+            query = query.filter(VehicleDetection.detected_at <= datetime.fromisoformat(end_time))
+        
+        tracks = query.order_by(VehicleDetection.detected_at.desc()).paginate(
+            page=page,
+            per_page=per_page,
+            error_out=False
+        )
+        
+        return jsonify({
+            'tracks': [track.to_dict() for track in tracks.items],
+            'total': tracks.total,
+            'page': page,
+            'per_page': per_page,
+            'pages': tracks.pages
+        }), 200
+    except Exception as e:
+        logger.error(f'获取车辆轨迹失败: {str(e)}')
+        return jsonify({'error': '获取车辆轨迹失败'}), 500
+
+@app.route('/api/vehicles/tracks', methods=['POST'])
+def create_vehicle_track():
+    """创建车辆轨迹点"""
+    try:
+        data = request.get_json()
+        
+        # 验证必填字段
+        required_fields = ['vehicleId', 'cameraId', 'latitude', 'longitude']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'error': f'{field}不能为空'}), 400
+        
+        # 创建轨迹点
+        track = VehicleDetection(
+            vehicle_id=data['vehicleId'],
+            camera_id=data['cameraId'],
+            detected_at=datetime.fromisoformat(data.get('detectedAt', datetime.utcnow().isoformat())),
+            latitude=data['latitude'],
+            longitude=data['longitude'],
+            confidence=data.get('confidence', 0.9),
+            speed=data.get('speed', 0),
+            direction=data.get('direction', 0),
+            image_url=data.get('imageUrl')
+        )
+        
+        db.session.add(track)
+        db.session.commit()
+        
+        return jsonify(track.to_dict()), 201
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'创建车辆轨迹失败: {str(e)}')
+        logger.error(f'错误详情: {repr(e)}')
+        return jsonify({'error': f'创建车辆轨迹失败: {str(e)}'}), 500
+
+@app.route('/api/vehicles/<vehicle_id>/alerts', methods=['GET'])
+def get_vehicle_alerts(vehicle_id):
+    """获取车辆告警"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        is_read = request.args.get('is_read')
+        
+        query = VehicleAlert.query.filter_by(vehicle_id=vehicle_id)
+        
+        if is_read is not None:
+            query = query.filter_by(is_read=is_read.lower() == 'true')
+        
+        alerts = query.order_by(VehicleAlert.created_at.desc()).paginate(
+            page=page,
+            per_page=per_page,
+            error_out=False
+        )
+        
+        return jsonify({
+            'alerts': [alert.to_dict() for alert in alerts.items],
+            'total': alerts.total,
+            'page': page,
+            'per_page': per_page,
+            'pages': alerts.pages
+        }), 200
+    except Exception as e:
+        logger.error(f'获取车辆告警失败: {str(e)}')
+        return jsonify({'error': '获取车辆告警失败'}), 500
+
+@app.route('/api/vehicles/alerts/<alert_id>/read', methods=['POST'])
+def mark_alert_read(alert_id):
+    """标记告警为已读"""
+    try:
+        alert = VehicleAlert.query.get(alert_id)
+        if not alert:
+            return jsonify({'error': '告警不存在'}), 404
+        
+        alert.is_read = True
+        alert.read_at = datetime.utcnow()
+        db.session.commit()
+        
+        return jsonify(alert.to_dict()), 200
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'标记告警已读失败: {str(e)}')
+        return jsonify({'error': '标记告警已读失败'}), 500
+
+@app.route('/api/vehicles/alerts/<alert_id>/resolve', methods=['POST'])
+def resolve_alert(alert_id):
+    """解决告警"""
+    try:
+        alert = VehicleAlert.query.get(alert_id)
+        if not alert:
+            return jsonify({'error': '告警不存在'}), 404
+        
+        alert.is_resolved = True
+        alert.resolved_at = datetime.utcnow()
+        db.session.commit()
+        
+        return jsonify(alert.to_dict()), 200
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'解决告警失败: {str(e)}')
+        return jsonify({'error': '解决告警失败'}), 500
 
 # 检测API
 @app.route('/api/detection', methods=['GET'])
@@ -675,6 +980,7 @@ if __name__ == '__main__':
                     # 创建表
                     db.create_all()
                     print("✅ 数据库表创建完成")
+                    
             
             # 检查摄像头数据
             try:

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Vehicle, VehicleReID, VehicleTrajectory, SuspiciousVehicle, VehicleAlert } from '@/types'
+import { vehicleAPI } from '@/api/backend'
 
 export const useVehicleStore = defineStore('vehicle', () => {
   // 状态
@@ -62,6 +63,112 @@ export const useVehicleStore = defineStore('vehicle', () => {
     // 同时移除相关数据
     removeTrajectory(vehicleId)
     removeSuspiciousVehicle(vehicleId)
+  }
+
+  // 后端API方法
+  const fetchVehicles = async (params?: any) => {
+    try {
+      const response = await vehicleAPI.getVehicles(params)
+      vehicles.value = response.data.vehicles || []
+      return response.data
+    } catch (error) {
+      console.error('获取车辆列表失败:', error)
+      throw error
+    }
+  }
+
+  const fetchVehicle = async (vehicleId: string) => {
+    try {
+      const response = await vehicleAPI.getVehicle(vehicleId)
+      addVehicle(response.data)
+      return response.data
+    } catch (error) {
+      console.error('获取车辆信息失败:', error)
+      throw error
+    }
+  }
+
+  const createVehicle = async (vehicleData: any) => {
+    try {
+      const response = await vehicleAPI.createVehicle(vehicleData)
+      addVehicle(response.data)
+      return response.data
+    } catch (error) {
+      console.error('创建车辆失败:', error)
+      throw error
+    }
+  }
+
+  const updateVehicle = async (vehicleId: string, vehicleData: any) => {
+    try {
+      const response = await vehicleAPI.updateVehicle(vehicleId, vehicleData)
+      addVehicle(response.data)
+      return response.data
+    } catch (error) {
+      console.error('更新车辆失败:', error)
+      throw error
+    }
+  }
+
+  const deleteVehicle = async (vehicleId: string) => {
+    try {
+      await vehicleAPI.deleteVehicle(vehicleId)
+      removeVehicle(vehicleId)
+    } catch (error) {
+      console.error('删除车辆失败:', error)
+      throw error
+    }
+  }
+
+  const fetchSuspiciousVehicles = async () => {
+    try {
+      const response = await vehicleAPI.getSuspiciousVehicles()
+      suspiciousVehicles.value = response.data.map((vehicle: any) => ({
+        vehicleId: vehicle.id,
+        plateNumber: vehicle.plateNumber,
+        vehicleType: vehicle.vehicleType,
+        riskLevel: vehicle.riskLevel,
+        severity: vehicle.riskLevel,
+        reason: '标记为可疑',
+        timestamp: vehicle.createdAt,
+        isActive: true
+      }))
+      return response.data
+    } catch (error) {
+      console.error('获取可疑车辆失败:', error)
+      throw error
+    }
+  }
+
+  const markVehicleSuspicious = async (vehicleId: string, data: any) => {
+    try {
+      const response = await vehicleAPI.markSuspicious(vehicleId, data)
+      addVehicle(response.data)
+      return response.data
+    } catch (error) {
+      console.error('标记可疑车辆失败:', error)
+      throw error
+    }
+  }
+
+  const fetchVehicleStats = async () => {
+    try {
+      const response = await vehicleAPI.getVehicleStats()
+      return response.data
+    } catch (error) {
+      console.error('获取车辆统计失败:', error)
+      throw error
+    }
+  }
+
+  const fetchVehicleTracks = async (vehicleId: string, params?: any) => {
+    try {
+      const response = await vehicleAPI.getVehicleTracks(vehicleId, params)
+      return response.data.tracks || []
+    } catch (error) {
+      console.error('获取车辆轨迹失败:', error)
+      throw error
+    }
   }
 
   const addVehicleReID = (reid: VehicleReID) => {
@@ -187,7 +294,7 @@ export const useVehicleStore = defineStore('vehicle', () => {
     criticalAlerts,
     vehicleById,
     
-    // 方法
+    // 本地方法
     addVehicle,
     removeVehicle,
     addVehicleReID,
@@ -206,6 +313,17 @@ export const useVehicleStore = defineStore('vehicle', () => {
     stopTracking,
     clearOldData,
     getVehiclesByCamera,
-    getSuspiciousVehiclesBySeverity
+    getSuspiciousVehiclesBySeverity,
+    
+    // 后端API方法
+    fetchVehicles,
+    fetchVehicle,
+    createVehicle,
+    updateVehicle,
+    deleteVehicle,
+    fetchSuspiciousVehicles,
+    markVehicleSuspicious,
+    fetchVehicleStats,
+    fetchVehicleTracks
   }
 })

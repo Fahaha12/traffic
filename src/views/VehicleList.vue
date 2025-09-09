@@ -44,6 +44,15 @@
                   </el-select>
                 </el-form-item>
                 
+                <el-form-item label="风险等级">
+                  <el-select v-model="filters.riskLevel" placeholder="全部等级" clearable>
+                    <el-option label="低风险" value="low" />
+                    <el-option label="中风险" value="medium" />
+                    <el-option label="高风险" value="high" />
+                    <el-option label="严重" value="critical" />
+                  </el-select>
+                </el-form-item>
+                
                 <el-form-item label="时间范围">
                   <el-date-picker
                     v-model="filters.dateRange"
@@ -75,6 +84,7 @@
               
               <el-table 
                 :data="filteredVehicles" 
+                :loading="loading"
                 style="width: 100%"
                 @row-click="handleVehicleClick"
               >
@@ -94,10 +104,18 @@
                 
                 <el-table-column prop="model" label="型号" width="120" />
                 
-                <el-table-column prop="status" label="状态" width="100">
+                <el-table-column prop="isSuspicious" label="状态" width="100">
                   <template #default="{ row }">
-                    <el-tag :type="getStatusTagType(row.status)" size="small">
-                      {{ getStatusText(row.status) }}
+                    <el-tag :type="row.isSuspicious ? 'warning' : 'success'" size="small">
+                      {{ row.isSuspicious ? '可疑' : '正常' }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+                
+                <el-table-column prop="riskLevel" label="风险等级" width="100">
+                  <template #default="{ row }">
+                    <el-tag :type="getRiskLevelType(row.riskLevel)" size="small">
+                      {{ getRiskLevelText(row.riskLevel) }}
                     </el-tag>
                   </template>
                 </el-table-column>
@@ -112,7 +130,7 @@
                 
                 <el-table-column prop="detectionCount" label="检测次数" width="100" />
                 
-                <el-table-column label="操作" width="200" fixed="right">
+                <el-table-column label="操作" width="250" fixed="right">
                   <template #default="{ row }">
                     <el-button type="text" size="small" @click.stop="viewTrajectory(row)">
                       轨迹
@@ -124,9 +142,17 @@
                       type="text" 
                       size="small" 
                       @click.stop="toggleSuspicious(row)"
-                      :class="{ 'danger': row.status === 'suspicious' }"
+                      :class="{ 'danger': row.isSuspicious }"
                     >
-                      {{ row.status === 'suspicious' ? '取消标记' : '标记可疑' }}
+                      {{ row.isSuspicious ? '取消标记' : '标记可疑' }}
+                    </el-button>
+                    <el-button 
+                      type="text" 
+                      size="small" 
+                      @click.stop="deleteVehicle(row)"
+                      class="danger"
+                    >
+                      删除
                     </el-button>
                   </template>
                 </el-table-column>
@@ -135,13 +161,13 @@
               <!-- 分页 -->
               <div class="pagination-wrapper">
                 <el-pagination
-                  v-model:current-page="currentPage"
-                  v-model:page-size="pageSize"
+                  v-model:current-page="pagination.page"
+                  v-model:page-size="pagination.pageSize"
                   :page-sizes="[10, 20, 50, 100]"
-                  :total="totalVehicles"
+                  :total="pagination.total"
                   layout="total, sizes, prev, pager, next, jumper"
                   @size-change="handleSizeChange"
-                  @current-change="handleCurrentChange"
+                  @current-change="handlePageChange"
                 />
               </div>
             </el-card>
@@ -226,107 +252,42 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { useVehicleStore } from '@/stores/vehicle'
 import LayoutHeader from '@/components/Layout/Header.vue'
 import LayoutSidebar from '@/components/Layout/Sidebar.vue'
 import { dateUtils } from '@/utils/dateUtils'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 const router = useRouter()
 const userStore = useUserStore()
+const vehicleStore = useVehicleStore()
 
 // 响应式数据
-const vehicles = ref([
-  {
-    id: '1',
-    plateNumber: '豫A12345',
-    vehicleType: 'car',
-    color: '白色',
-    brand: '大众',
-    model: '朗逸',
-    status: 'normal',
-    lastSeen: new Date().toISOString(),
-    location: '郑州市中原路与建设路交叉口',
-    detectionCount: 15,
-    firstSeen: new Date(Date.now() - 86400000).toISOString(),
-    images: [
-      {
-        id: '1',
-        url: 'https://via.placeholder.com/300x200?text=Vehicle+Image',
-        timestamp: new Date().toISOString()
-      }
-    ]
-  },
-  {
-    id: '2',
-    plateNumber: '豫B67890',
-    vehicleType: 'truck',
-    color: '蓝色',
-    brand: '解放',
-    model: 'J6P',
-    status: 'suspicious',
-    lastSeen: new Date(Date.now() - 1800000).toISOString(),
-    location: '郑州市金水区花园路',
-    detectionCount: 8,
-    firstSeen: new Date(Date.now() - 172800000).toISOString(),
-    images: []
-  },
-  {
-    id: '3',
-    plateNumber: '豫C11111',
-    vehicleType: 'car',
-    color: '黑色',
-    brand: '奔驰',
-    model: 'E300L',
-    status: 'blacklist',
-    lastSeen: new Date(Date.now() - 3600000).toISOString(),
-    location: '郑州市二七区大学路',
-    detectionCount: 3,
-    firstSeen: new Date(Date.now() - 259200000).toISOString(),
-    images: []
-  }
-])
+const vehicles = ref([])
+const loading = ref(false)
+const pagination = ref({
+  total: 0,
+  page: 1,
+  pageSize: 20,
+  pages: 0
+})
 
 const filters = reactive({
   plateNumber: '',
   vehicleType: '',
   status: '',
+  riskLevel: '',
   dateRange: null as any
 })
 
-const currentPage = ref(1)
-const pageSize = ref(20)
 const showDetailDialog = ref(false)
 const selectedVehicle = ref<any>(null)
 
 // 计算属性
-const totalVehicles = computed(() => filteredVehicles.value.length)
+const totalVehicles = computed(() => pagination.value.total)
 
 const filteredVehicles = computed(() => {
-  let result = vehicles.value
-  
-  if (filters.plateNumber) {
-    result = result.filter(vehicle => 
-      vehicle.plateNumber.toLowerCase().includes(filters.plateNumber.toLowerCase())
-    )
-  }
-  
-  if (filters.vehicleType) {
-    result = result.filter(vehicle => vehicle.vehicleType === filters.vehicleType)
-  }
-  
-  if (filters.status) {
-    result = result.filter(vehicle => vehicle.status === filters.status)
-  }
-  
-  if (filters.dateRange && filters.dateRange.length === 2) {
-    const [start, end] = filters.dateRange
-    result = result.filter(vehicle => {
-      const vehicleTime = new Date(vehicle.lastSeen)
-      return vehicleTime >= new Date(start) && vehicleTime <= new Date(end)
-    })
-  }
-  
-  return result
+  return vehicles.value
 })
 
 // 方法
@@ -335,6 +296,8 @@ const getVehicleTypeText = (type: string) => {
     car: '小型汽车',
     truck: '大型汽车',
     motorcycle: '摩托车',
+    bus: '公交车',
+    bicycle: '自行车',
     other: '其他'
   }
   return typeMap[type] || type
@@ -345,6 +308,8 @@ const getVehicleTypeTagType = (type: string) => {
     car: 'primary',
     truck: 'warning',
     motorcycle: 'info',
+    bus: 'success',
+    bicycle: 'info',
     other: 'success'
   }
   return typeMap[type] || 'info'
@@ -368,13 +333,61 @@ const getStatusTagType = (status: string) => {
   return typeMap[status] || 'info'
 }
 
+const getRiskLevelText = (level: string) => {
+  const levelMap: Record<string, string> = {
+    low: '低风险',
+    medium: '中风险',
+    high: '高风险',
+    critical: '严重'
+  }
+  return levelMap[level] || level
+}
+
+const getRiskLevelType = (level: string) => {
+  const typeMap: Record<string, string> = {
+    low: 'success',
+    medium: 'warning',
+    high: 'danger',
+    critical: 'danger'
+  }
+  return typeMap[level] || 'info'
+}
+
 const formatTime = (timestamp: string) => {
   return dateUtils.formatDateTime(timestamp)
 }
 
+const loadVehicles = async () => {
+  try {
+    loading.value = true
+    const params = {
+      page: pagination.value.page,
+      per_page: pagination.value.pageSize,
+      search: filters.plateNumber,
+      type: filters.vehicleType,
+      is_suspicious: filters.status === 'suspicious' ? 'true' : filters.status === 'normal' ? 'false' : undefined,
+      risk_level: filters.riskLevel
+    }
+    
+    const response = await vehicleStore.fetchVehicles(params)
+    vehicles.value = response.vehicles || []
+    pagination.value = {
+      total: response.total || 0,
+      page: response.page || 1,
+      pageSize: response.per_page || 20,
+      pages: response.pages || 0
+    }
+  } catch (error) {
+    console.error('加载车辆列表失败:', error)
+    ElMessage.error('加载车辆列表失败')
+  } finally {
+    loading.value = false
+  }
+}
+
 const applyFilters = () => {
-  currentPage.value = 1
-  ElMessage.success('筛选条件已应用')
+  pagination.value.page = 1
+  loadVehicles()
 }
 
 const resetFilters = () => {
@@ -382,13 +395,16 @@ const resetFilters = () => {
     plateNumber: '',
     vehicleType: '',
     status: '',
+    riskLevel: '',
     dateRange: null
   })
-  currentPage.value = 1
+  pagination.value.page = 1
+  loadVehicles()
   ElMessage.success('筛选条件已重置')
 }
 
-const refreshVehicles = () => {
+const refreshVehicles = async () => {
+  await loadVehicles()
   ElMessage.success('车辆列表已刷新')
 }
 
@@ -412,19 +428,60 @@ const viewTrajectory = (vehicle: any) => {
   }
 }
 
-const toggleSuspicious = (vehicle: any) => {
-  if (vehicle.status === 'suspicious') {
-    vehicle.status = 'normal'
-    ElMessage.success('已取消可疑标记')
-  } else {
-    vehicle.status = 'suspicious'
-    ElMessage.success('已标记为可疑车辆')
+const toggleSuspicious = async (vehicle: any) => {
+  try {
+    if (vehicle.isSuspicious) {
+      await vehicleStore.markVehicleSuspicious(vehicle.id, {
+        isSuspicious: false,
+        riskLevel: 'low'
+      })
+      ElMessage.success('已取消可疑标记')
+    } else {
+      await vehicleStore.markVehicleSuspicious(vehicle.id, {
+        isSuspicious: true,
+        riskLevel: 'medium'
+      })
+      ElMessage.success('已标记为可疑车辆')
+    }
+    await loadVehicles()
+  } catch (error) {
+    console.error('操作失败:', error)
+    ElMessage.error('操作失败')
+  }
+}
+
+const deleteVehicle = async (vehicle: any) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除车辆 ${vehicle.plateNumber} 吗？`,
+      '确认删除',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    await vehicleStore.deleteVehicle(vehicle.id)
+    ElMessage.success('车辆删除成功')
+    await loadVehicles()
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('删除车辆失败:', error)
+      ElMessage.error('删除车辆失败')
+    }
   }
 }
 
 const handleSizeChange = (size: number) => {
-  pageSize.value = size
-  currentPage.value = 1
+  pagination.value.pageSize = size
+  pagination.value.page = 1
+  loadVehicles()
+}
+
+const handlePageChange = (page: number) => {
+  pagination.value.page = page
+  loadVehicles()
 }
 
 const handleCurrentChange = (page: number) => {
@@ -432,7 +489,7 @@ const handleCurrentChange = (page: number) => {
 }
 
 onMounted(() => {
-  // 初始化数据
+  loadVehicles()
 })
 </script>
 

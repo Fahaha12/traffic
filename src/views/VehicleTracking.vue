@@ -163,6 +163,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { useVehicleStore } from '@/stores/vehicle'
 import LayoutHeader from '@/components/Layout/Header.vue'
 import LayoutSidebar from '@/components/Layout/Sidebar.vue'
 import { dateUtils } from '@/utils/dateUtils'
@@ -171,6 +172,7 @@ import L from 'leaflet'
 
 const route = useRoute()
 const userStore = useUserStore()
+const vehicleStore = useVehicleStore()
 
 // 响应式数据
 const mapContainer = ref<HTMLElement>()
@@ -185,59 +187,7 @@ const searchForm = reactive({
   dateRange: null as any
 })
 
-// 模拟轨迹数据
-const mockTrajectoryData = [
-  {
-    id: '1',
-    plateNumber: '豫A12345',
-    vehicleType: 'car',
-    color: '白色',
-    brand: '大众',
-    model: '朗逸',
-    points: [
-      {
-        lat: 34.7466,
-        lng: 113.6253,
-        timestamp: new Date(Date.now() - 3600000).toISOString(),
-        speed: 45,
-        direction: 90,
-        location: '郑州市政府'
-      },
-      {
-        lat: 34.7500,
-        lng: 113.6300,
-        timestamp: new Date(Date.now() - 3300000).toISOString(),
-        speed: 52,
-        direction: 95,
-        location: '中原路与建设路交叉口'
-      },
-      {
-        lat: 34.7600,
-        lng: 113.6400,
-        timestamp: new Date(Date.now() - 3000000).toISOString(),
-        speed: 38,
-        direction: 100,
-        location: '金水区花园路'
-      },
-      {
-        lat: 34.7700,
-        lng: 113.6500,
-        timestamp: new Date(Date.now() - 2700000).toISOString(),
-        speed: 60,
-        direction: 105,
-        location: '二七区大学路'
-      },
-      {
-        lat: 34.7800,
-        lng: 113.6600,
-        timestamp: new Date(Date.now() - 2400000).toISOString(),
-        speed: 0,
-        direction: 0,
-        location: '管城区商城路'
-      }
-    ]
-  }
-]
+// 轨迹数据将从后端API获取
 
 // 计算属性
 const totalDistance = computed(() => {
@@ -328,23 +278,39 @@ const initMap = () => {
   }
 }
 
-const searchVehicle = () => {
+const searchVehicle = async () => {
   if (!searchForm.plateNumber) {
     ElMessage.warning('请输入车牌号')
     return
   }
   
-  const vehicle = mockTrajectoryData.find(v => 
-    v.plateNumber.toLowerCase().includes(searchForm.plateNumber.toLowerCase())
-  )
-  
-  if (vehicle) {
+  try {
+    // 从后端获取车辆信息
+    const vehicles = await vehicleStore.fetchVehicles({ search: searchForm.plateNumber })
+    if (vehicles.vehicles.length === 0) {
+      ElMessage.error('未找到该车辆')
+      return
+    }
+    
+    const vehicle = vehicles.vehicles[0]
     selectedVehicle.value = vehicle
-    trajectoryPoints.value = vehicle.points
+    
+    // 获取车辆轨迹
+    const tracks = await vehicleStore.fetchVehicleTracks(vehicle.id)
+    trajectoryPoints.value = tracks.map(track => ({
+      lat: track.latitude,
+      lng: track.longitude,
+      timestamp: track.detectedAt,
+      speed: track.speed,
+      direction: track.direction,
+      location: track.cameraId
+    }))
+    
     drawTrajectory()
     ElMessage.success('找到车辆轨迹')
-  } else {
-    ElMessage.error('未找到该车辆的轨迹数据')
+  } catch (error) {
+    console.error('搜索车辆失败:', error)
+    ElMessage.error('搜索车辆失败')
   }
 }
 
