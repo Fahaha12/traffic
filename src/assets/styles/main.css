@@ -123,9 +123,57 @@ html.dark {
   background: var(--success-color);
 }
 
+/* 全局表格样式优化 */
+.el-table {
+  font-size: 14px;
+}
+
+.el-table th,
+.el-table td {
+  padding: 8px 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.el-table .cell {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
+}
+
+.el-table .el-table__body-wrapper {
+  overflow-x: auto;
+}
+
+/* 表格卡片样式 */
+.table-card {
+  overflow: hidden;
+}
+
+.table-card .el-card__body {
+  padding: 0;
+}
+
+.table-card .el-table {
+  height: 100%;
+}
+
+.table-card .el-table__body-wrapper {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
 /* 响应式布局 */
 @media (max-width: 768px) {
   :root {
     --sidebar-width: 200px;
+  }
+  
+  .el-table th,
+  .el-table td {
+    padding: 6px 8px;
+    font-size: 12px;
   }
 }

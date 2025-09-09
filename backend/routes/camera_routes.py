@@ -246,3 +246,60 @@ def delete_camera(camera_id):
         db.session.rollback()
         logger.error(f'删除摄像头失败: {str(e)}')
         return jsonify({'error': '删除摄像头失败'}), 500
+
+@camera_bp.route('/api/cameras/check-status', methods=['POST'])
+def check_all_camera_status():
+    """批量检测所有摄像头状态"""
+    try:
+        cameras = Camera.query.all()
+        updated_count = 0
+        
+        for camera in cameras:
+            # 获取实际状态
+            actual_status = camera.get_actual_status()
+            
+            # 如果实际状态与数据库状态不同，更新数据库
+            if actual_status != camera.status:
+                old_status = camera.status
+                camera.status = actual_status
+                camera.updated_at = datetime.utcnow()
+                updated_count += 1
+                
+                logger.info(f'摄像头 {camera.name} 状态从 {old_status} 更新为 {actual_status}')
+        
+        # 提交所有更改
+        if updated_count > 0:
+            db.session.commit()
+        
+        return jsonify({
+            'message': f'状态检测完成，更新了 {updated_count} 个摄像头',
+            'updated_count': updated_count,
+            'total_cameras': len(cameras)
+        }), 200
+        
+    except Exception as e:
+        logger.error(f'批量检测摄像头状态失败: {str(e)}')
+        db.session.rollback()
+        return jsonify({'error': '批量检测摄像头状态失败'}), 500
+
+@camera_bp.route('/api/cameras/status-summary', methods=['GET'])
+def get_camera_status_summary():
+    """获取摄像头状态统计"""
+    try:
+        cameras = Camera.query.all()
+        
+        # 统计实际状态
+        status_counts = {'online': 0, 'offline': 0, 'maintenance': 0}
+        for camera in cameras:
+            actual_status = camera.get_actual_status()
+            status_counts[actual_status] = status_counts.get(actual_status, 0) + 1
+        
+        return jsonify({
+            'total': len(cameras),
+            'status_counts': status_counts,
+            'online_percentage': round((status_counts['online'] / len(cameras)) * 100, 2) if cameras else 0
+        }), 200
+        
+    except Exception as e:
+        logger.error(f'获取摄像头状态统计失败: {str(e)}')
+        return jsonify({'error': '获取摄像头状态统计失败'}), 500

@@ -2,7 +2,10 @@
 数据库模型定义
 """
 from datetime import datetime
+import logging
 from .database import db
+
+logger = logging.getLogger(__name__)
 
 class Camera(db.Model):
     """摄像头模型"""
@@ -46,8 +49,74 @@ class Camera(db.Model):
         }
     
     def get_actual_status(self):
-        """获取实际状态（这里可以添加实际的连接检查逻辑）"""
-        return self.status or 'offline'
+        """获取实际状态（检查真实的连接状态）"""
+        try:
+            # 如果数据库状态是online，直接返回
+            if self.status == 'online':
+                return 'online'
+            
+            # 如果数据库状态是maintenance，直接返回
+            if self.status == 'maintenance':
+                return 'maintenance'
+            
+            # 对于offline状态，进行实际的连接检测
+            if self.stream_type == 'hls':
+                return self._check_hls_connection()
+            elif self.stream_type == 'rtmp':
+                return self._check_rtmp_connection()
+            elif self.stream_type == 'http':
+                return self._check_http_connection()
+            elif self.stream_type == 'webrtc':
+                return self._check_webrtc_connection()
+            else:
+                return 'offline'
+                
+        except Exception as e:
+            logger.error(f'检测摄像头 {self.name} 状态失败: {str(e)}')
+            return 'offline'
+    
+    def _check_hls_connection(self):
+        """检查HLS流连接"""
+        try:
+            import requests
+            response = requests.get(self.stream_url, timeout=5)
+            if response.status_code == 200:
+                # 检查是否包含HLS相关内容
+                content_type = response.headers.get('content-type', '')
+                if 'application/vnd.apple.mpegurl' in content_type or 'm3u8' in self.stream_url:
+                    return 'online'
+            return 'offline'
+        except Exception:
+            return 'offline'
+    
+    def _check_rtmp_connection(self):
+        """检查RTMP流连接"""
+        try:
+            # 对于RTMP流，检查是否有对应的HLS转换
+            from .stream_tools import stream_manager
+            status = stream_manager.get_conversion_status(self.id)
+            if status and status.get('status') == 'converting':
+                return 'online'
+            return 'offline'
+        except Exception:
+            return 'offline'
+    
+    def _check_http_connection(self):
+        """检查HTTP流连接"""
+        try:
+            import requests
+            response = requests.head(self.stream_url, timeout=5)
+            if response.status_code == 200:
+                return 'online'
+            return 'offline'
+        except Exception:
+            return 'offline'
+    
+    def _check_webrtc_connection(self):
+        """检查WebRTC连接"""
+        # WebRTC连接检测比较复杂，这里暂时返回offline
+        # 在实际应用中，可以通过WebRTC API进行检测
+        return 'offline'
 
 class Vehicle(db.Model):
     """车辆模型"""

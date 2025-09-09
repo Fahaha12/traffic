@@ -147,7 +147,7 @@
                   </div>
                 </template>
                 <el-table :data="recentAlerts" style="width: 100%">
-                  <el-table-column prop="message" label="告警内容" />
+                  <el-table-column prop="message" label="告警内容" min-width="200" show-overflow-tooltip />
                   <el-table-column prop="type" label="类型" width="100">
                     <template #default="{ row }">
                       <el-tag :type="getAlertType(row.type)" size="small">
@@ -179,7 +179,7 @@
                   </div>
                 </template>
                 <el-table :data="cameraStats" style="width: 100%">
-                  <el-table-column prop="name" label="摄像头名称" />
+                  <el-table-column prop="name" label="摄像头名称" min-width="150" show-overflow-tooltip />
                   <el-table-column prop="type" label="类型" width="100">
                     <template #default="{ row }">
                       {{ getCameraTypeText(row.type) }}
@@ -270,7 +270,11 @@ const vehicleTypeChartOption = reactive({
   legend: {
     orient: 'vertical',
     left: 'left',
-    textStyle: { color: '#fff' }
+    top: 'center',
+    textStyle: { color: '#fff' },
+    itemGap: 15,
+    itemWidth: 20,
+    itemHeight: 14
   },
   series: [
     {
@@ -336,7 +340,20 @@ const suspiciousTrendChartOption = reactive({
   },
   legend: {
     data: ['可疑车辆', '告警数量'],
-    textStyle: { color: '#fff' }
+    textStyle: { color: '#fff' },
+    top: '10%',
+    left: 'center',
+    orient: 'horizontal',
+    itemGap: 30,
+    itemWidth: 20,
+    itemHeight: 14
+  },
+  grid: {
+    top: '25%',
+    left: '3%',
+    right: '4%',
+    bottom: '3%',
+    containLabel: true
   },
   xAxis: {
     type: 'category',
@@ -606,5 +623,49 @@ onMounted(() => {
 
 :deep(.echarts) {
   background: transparent;
+}
+
+/* 表格样式优化 */
+:deep(.el-table) {
+  font-size: 14px;
+}
+
+:deep(.el-table th),
+:deep(.el-table td) {
+  padding: 8px 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+:deep(.el-table .cell) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
+}
+
+:deep(.el-table .el-table__body-wrapper) {
+  overflow-x: auto;
+}
+
+/* 表格卡片样式 */
+.table-card {
+  height: 400px;
+  overflow: hidden;
+}
+
+.table-card :deep(.el-card__body) {
+  height: calc(100% - 60px);
+  padding: 0;
+}
+
+.table-card :deep(.el-table) {
+  height: 100%;
+}
+
+.table-card :deep(.el-table__body-wrapper) {
+  max-height: 300px;
+  overflow-y: auto;
 }
 </style>

@@ -222,7 +222,7 @@
                 <div class="user-management">
                   <div class="user-list">
                     <el-table :data="users" style="width: 100%">
-                      <el-table-column prop="username" label="用户名" />
+                      <el-table-column prop="username" label="用户名" min-width="150" show-overflow-tooltip />
                       <el-table-column prop="role" label="角色" width="120">
                         <template #default="{ row }">
                           <el-tag :type="getRoleType(row.role)" size="small">
