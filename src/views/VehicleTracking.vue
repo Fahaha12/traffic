@@ -4,54 +4,98 @@
     <div class="vehicle-tracking-content">
       <LayoutSidebar />
       <div class="main-content">
-        <div class="vehicle-tracking-header">
-          <h1>轨迹追踪</h1>
+        <div class="tracking-header">
+          <h1>车辆轨迹追踪</h1>
           <div class="header-actions">
-            <el-button type="primary" @click="refreshTracking">
+            <el-button @click="goBack">
+              <el-icon><ArrowLeft /></el-icon>
+              返回
+            </el-button>
+            <el-button type="primary" @click="refreshTracks">
               <el-icon><Refresh /></el-icon>
               刷新
             </el-button>
-            <el-button @click="exportTrajectory">
+            <el-button @click="exportTrajectory" v-if="tracks.length > 0">
               <el-icon><Download /></el-icon>
               导出轨迹
             </el-button>
           </div>
         </div>
         
-        <div class="vehicle-tracking-content-wrapper">
-          <!-- 车辆选择 -->
-          <div class="vehicle-selector">
-            <el-card>
-              <el-form :model="searchForm" inline>
-                <el-form-item label="车牌号">
-                  <el-input 
-                    v-model="searchForm.plateNumber" 
-                    placeholder="请输入车牌号" 
-                    @keyup.enter="searchVehicle"
-                    style="width: 200px"
-                  />
-                </el-form-item>
-                
-                <el-form-item label="时间范围">
-                  <el-date-picker
-                    v-model="searchForm.dateRange"
-                    type="datetimerange"
-                    range-separator="至"
-                    start-placeholder="开始时间"
-                    end-placeholder="结束时间"
-                    format="YYYY-MM-DD HH:mm:ss"
-                    value-format="YYYY-MM-DD HH:mm:ss"
-                    style="width: 400px"
-                  />
-                </el-form-item>
-                
-                <el-form-item>
-                  <el-button type="primary" @click="searchVehicle">搜索</el-button>
-                  <el-button @click="clearSearch">清空</el-button>
-                </el-form-item>
-              </el-form>
-            </el-card>
-          </div>
+        <div class="tracking-content">
+          <!-- 车辆信息和轨迹控制并排 -->
+          <el-row :gutter="20" class="info-controls-row">
+            <!-- 车辆信息卡片 -->
+            <el-col :span="12">
+              <el-card class="vehicle-info-card" v-if="vehicleInfo">
+                <template #header>
+                  <div class="card-header">
+                    <span>车辆信息</span>
+                    <el-tag :type="vehicleInfo.isSuspicious ? 'warning' : 'success'" size="small">
+                      {{ vehicleInfo.isSuspicious ? '可疑' : '正常' }}
+                    </el-tag>
+                  </div>
+                </template>
+                <div class="vehicle-info">
+                  <div class="info-item">
+                    <label>车牌号：</label>
+                    <span>{{ vehicleInfo.plateNumber }}</span>
+                  </div>
+                  <div class="info-item">
+                    <label>车辆类型：</label>
+                    <el-tag :type="getVehicleTypeTagType(vehicleInfo.vehicleType)" size="small">
+                      {{ getVehicleTypeText(vehicleInfo.vehicleType) }}
+                    </el-tag>
+                  </div>
+                  <div class="info-item">
+                    <label>颜色：</label>
+                    <span>{{ vehicleInfo.color || '未知' }}</span>
+                  </div>
+                  <div class="info-item">
+                    <label>品牌：</label>
+                    <span>{{ vehicleInfo.brand || '未知' }}</span>
+                  </div>
+                </div>
+              </el-card>
+            </el-col>
+            
+            <!-- 轨迹控制面板 -->
+            <el-col :span="12">
+              <el-card class="tracking-controls">
+                <template #header>
+                  <span>轨迹控制</span>
+                </template>
+                <div class="controls-content">
+                  <el-form :model="trackingParams" inline>
+                    <el-form-item label="时间范围">
+                      <el-date-picker
+                        v-model="trackingParams.dateRange"
+                        type="datetimerange"
+                        range-separator="至"
+                        start-placeholder="开始时间"
+                        end-placeholder="结束时间"
+                        format="YYYY-MM-DD HH:mm:ss"
+                        value-format="YYYY-MM-DD HH:mm:ss"
+                        style="width: 100%"
+                      />
+                    </el-form-item>
+                    <el-form-item label="轨迹点数">
+                      <el-input-number
+                        v-model="trackingParams.limit"
+                        :min="10"
+                        :max="1000"
+                        controls-position="right"
+                        style="width: 100%"
+                      />
+                    </el-form-item>
+                    <el-form-item>
+                      <el-button type="primary" @click="loadTracks" style="width: 100%">查询轨迹</el-button>
+                    </el-form-item>
+                  </el-form>
+                </div>
+              </el-card>
+            </el-col>
+          </el-row>
           
           <!-- 地图和轨迹信息 -->
           <div class="tracking-main">
@@ -64,7 +108,7 @@
                       <span>轨迹地图</span>
                       <div class="map-controls">
                         <el-button size="small" @click="fitBounds">适应范围</el-button>
-                        <el-button size="small" @click="playTrajectory" :disabled="!selectedVehicle">
+                        <el-button size="small" @click="playTrajectory" :disabled="!vehicleInfo || tracks.length === 0">
                           <el-icon><VideoPlay /></el-icon>
                           播放轨迹
                         </el-button>
@@ -89,21 +133,21 @@
                     <span>轨迹信息</span>
                   </template>
                   
-                  <div v-if="selectedVehicle" class="vehicle-info">
+                  <div v-if="vehicleInfo" class="vehicle-info">
                     <el-descriptions :column="1" border>
                       <el-descriptions-item label="车牌号">
-                        {{ selectedVehicle.plateNumber }}
+                        {{ vehicleInfo.plateNumber }}
                       </el-descriptions-item>
                       <el-descriptions-item label="车辆类型">
-                        <el-tag :type="getVehicleTypeTagType(selectedVehicle.vehicleType)" size="small">
-                          {{ getVehicleTypeText(selectedVehicle.vehicleType) }}
+                        <el-tag :type="getVehicleTypeTagType(vehicleInfo.vehicleType)" size="small">
+                          {{ getVehicleTypeText(vehicleInfo.vehicleType) }}
                         </el-tag>
                       </el-descriptions-item>
                       <el-descriptions-item label="颜色">
-                        {{ selectedVehicle.color }}
+                        {{ vehicleInfo.color || '未知' }}
                       </el-descriptions-item>
                       <el-descriptions-item label="轨迹点数">
-                        {{ trajectoryPoints.length }}
+                        {{ tracks.length }}
                       </el-descriptions-item>
                       <el-descriptions-item label="总距离">
                         {{ totalDistance.toFixed(2) }} 公里
@@ -124,102 +168,198 @@
                     <el-empty description="请选择车辆查看轨迹" />
                   </div>
                 </el-card>
-                
-                <!-- 轨迹点列表 -->
-                <el-card class="points-card" v-if="selectedVehicle">
-                  <template #header>
-                    <span>轨迹点列表</span>
-                  </template>
-                  
-                  <div class="points-list">
-                    <el-timeline>
-                      <el-timeline-item
-                        v-for="(point, index) in trajectoryPoints"
-                        :key="index"
-                        :timestamp="formatTime(point.timestamp)"
-                        placement="top"
-                      >
-                        <div class="point-info">
-                          <div class="point-location">{{ point.location }}</div>
-                          <div class="point-details">
-                            <span>速度: {{ point.speed }} km/h</span>
-                            <span>方向: {{ point.direction }}°</span>
-                          </div>
-                        </div>
-                      </el-timeline-item>
-                    </el-timeline>
-                  </div>
-                </el-card>
               </el-col>
             </el-row>
+            
+            <!-- 轨迹点列表 - 移到地图下面 -->
+            <el-card class="points-card" v-if="vehicleInfo && tracks.length > 0">
+              <template #header>
+                <span>轨迹点列表 ({{ tracks.length }} 个点)</span>
+              </template>
+              
+              <el-table :data="tracks" style="width: 100%" max-height="400">
+                <el-table-column prop="detectedAt" label="检测时间" width="180">
+                  <template #default="{ row }">
+                    {{ formatTime(row.detectedAt) }}
+                  </template>
+                </el-table-column>
+                <el-table-column prop="latitude" label="纬度" width="120" />
+                <el-table-column prop="longitude" label="经度" width="120" />
+                <el-table-column prop="speed" label="速度" width="80">
+                  <template #default="{ row }">
+                    {{ row.speed || 0 }} km/h
+                  </template>
+                </el-table-column>
+                <el-table-column prop="direction" label="方向" width="80">
+                  <template #default="{ row }">
+                    {{ row.direction || 0 }}°
+                  </template>
+                </el-table-column>
+                <el-table-column prop="confidence" label="置信度" width="100">
+                  <template #default="{ row }">
+                    <el-progress
+                      :percentage="Math.round((row.confidence || 0) * 100)"
+                      :stroke-width="6"
+                      :show-text="false"
+                    />
+                  </template>
+                </el-table-column>
+                <el-table-column label="操作" width="120">
+                  <template #default="{ row, $index }">
+                    <el-button type="text" size="small" @click="goToTrack($index)">
+                      定位
+                    </el-button>
+                    <el-button type="text" size="small" @click="viewImage(row)" v-if="row.imageUrl">
+                      查看图片
+                    </el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </el-card>
           </div>
         </div>
       </div>
     </div>
+    
+    <!-- 图片预览对话框 -->
+    <el-dialog
+      v-model="showImageDialog"
+      :title="`轨迹图片 - ${formatTime(selectedImage?.detectedAt)}`"
+      width="800px"
+    >
+      <div class="image-preview">
+        <img
+          :src="selectedImage?.imageUrl"
+          :alt="`轨迹图片 - ${formatTime(selectedImage?.detectedAt)}`"
+          style="width: 100%; max-height: 400px"
+        />
+        <div class="image-info">
+          <p><strong>检测时间：</strong>{{ formatTime(selectedImage.detectedAt) }}</p>
+          <p><strong>位置：</strong>{{ selectedImage.latitude }}, {{ selectedImage.longitude }}</p>
+          <p><strong>置信度：</strong>{{ Math.round((selectedImage.confidence || 0) * 100) }}%</p>
+        </div>
+      </div>
+    </el-dialog>
+    
+    <!-- 车辆选择对话框 -->
+    <el-dialog
+      v-model="showVehicleSelector"
+      title="选择车辆"
+      width="600px"
+      :close-on-click-modal="false"
+    >
+      <div v-loading="vehicleListLoading">
+        <el-table :data="vehicleList" style="width: 100%" max-height="400">
+          <el-table-column type="selection" width="55">
+            <template #default="{ row }">
+              <el-radio 
+                v-model="selectedVehicleId" 
+                :label="row.id"
+                @change="selectedVehicleId = row.id"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column prop="plateNumber" label="车牌号" width="120" />
+          <el-table-column prop="vehicleType" label="类型" width="100">
+            <template #default="{ row }">
+              <el-tag :type="getVehicleTypeTagType(row.vehicleType)" size="small">
+                {{ getVehicleTypeText(row.vehicleType) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="color" label="颜色" width="80" />
+          <el-table-column prop="brand" label="品牌" width="100" />
+          <el-table-column prop="model" label="型号" width="100" />
+          <el-table-column prop="isSuspicious" label="状态" width="80">
+            <template #default="{ row }">
+              <el-tag :type="row.isSuspicious ? 'warning' : 'success'" size="small">
+                {{ row.isSuspicious ? '可疑' : '正常' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+      
+      <template #footer>
+        <el-button @click="goBack">取消</el-button>
+        <el-button type="primary" @click="selectVehicle" :disabled="!selectedVehicleId">
+          选择车辆
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
-import { useRoute } from 'vue-router'
-import { useUserStore } from '@/stores/user'
+import { useRoute, useRouter } from 'vue-router'
 import { useVehicleStore } from '@/stores/vehicle'
 import LayoutHeader from '@/components/Layout/Header.vue'
 import LayoutSidebar from '@/components/Layout/Sidebar.vue'
 import { dateUtils } from '@/utils/dateUtils'
 import { ElMessage } from 'element-plus'
+import { ArrowLeft, Refresh, Download, VideoPlay, VideoPause } from '@element-plus/icons-vue'
 import L from 'leaflet'
 
 const route = useRoute()
-const userStore = useUserStore()
+const router = useRouter()
 const vehicleStore = useVehicleStore()
 
 // 响应式数据
+const vehicleInfo = ref<any>(null)
+const tracks = ref<any[]>([])
+const loading = ref(false)
+const isPlaying = ref(false)
+const currentTrackIndex = ref(0)
+const showImageDialog = ref(false)
+const selectedImage = ref<any>(null)
 const mapContainer = ref<HTMLElement>()
 const mapInstance = ref<any>(null)
-const selectedVehicle = ref<any>(null)
-const trajectoryPoints = ref<any[]>([])
-const isPlaying = ref(false)
-const playInterval = ref<any>(null)
+const playbackTimer = ref<any>(null)
 
-const searchForm = reactive({
-  plateNumber: '',
-  dateRange: null as any
+// 车辆选择相关
+const showVehicleSelector = ref(false)
+const vehicleList = ref<any[]>([])
+const vehicleListLoading = ref(false)
+const selectedVehicleId = ref('')
+
+// 轨迹查询参数
+const trackingParams = reactive({
+  dateRange: null as any,
+  limit: 100
 })
-
-// 轨迹数据将从后端API获取
 
 // 计算属性
 const totalDistance = computed(() => {
-  if (trajectoryPoints.value.length < 2) return 0
+  if (tracks.value.length < 2) return 0
   
   let distance = 0
-  for (let i = 1; i < trajectoryPoints.value.length; i++) {
-    const prev = trajectoryPoints.value[i - 1]
-    const curr = trajectoryPoints.value[i]
-    distance += calculateDistance(prev.lat, prev.lng, curr.lat, curr.lng)
+  for (let i = 1; i < tracks.value.length; i++) {
+    const prev = tracks.value[i - 1]
+    const curr = tracks.value[i]
+    distance += calculateDistance(prev.latitude, prev.longitude, curr.latitude, curr.longitude)
   }
   return distance
 })
 
 const averageSpeed = computed(() => {
-  if (trajectoryPoints.value.length === 0) return 0
+  if (tracks.value.length === 0) return 0
   
-  const totalSpeed = trajectoryPoints.value.reduce((sum, point) => sum + point.speed, 0)
-  return totalSpeed / trajectoryPoints.value.length
+  const totalSpeed = tracks.value.reduce((sum, track) => sum + (track.speed || 0), 0)
+  return totalSpeed / tracks.value.length
 })
 
 const maxSpeed = computed(() => {
-  if (trajectoryPoints.value.length === 0) return 0
+  if (tracks.value.length === 0) return 0
   
-  return Math.max(...trajectoryPoints.value.map(point => point.speed))
+  return Math.max(...tracks.value.map(track => track.speed || 0))
 })
 
 const trackingDuration = computed(() => {
-  if (trajectoryPoints.value.length < 2) return '0分钟'
+  if (tracks.value.length < 2) return '0分钟'
   
-  const start = new Date(trajectoryPoints.value[0].timestamp)
-  const end = new Date(trajectoryPoints.value[trajectoryPoints.value.length - 1].timestamp)
+  const start = new Date(tracks.value[0].detectedAt)
+  const end = new Date(tracks.value[tracks.value.length - 1].detectedAt)
   const duration = end.getTime() - start.getTime()
   
   const hours = Math.floor(duration / 3600000)
@@ -238,16 +378,20 @@ const getVehicleTypeText = (type: string) => {
     car: '小型汽车',
     truck: '大型汽车',
     motorcycle: '摩托车',
+    bus: '公交车',
+    bicycle: '自行车',
     other: '其他'
   }
   return typeMap[type] || type
 }
 
-const getVehicleTypeTagType = (type: string) => {
-  const typeMap: Record<string, string> = {
+const getVehicleTypeTagType = (type: string): 'primary' | 'success' | 'info' | 'warning' | 'danger' => {
+  const typeMap: Record<string, 'primary' | 'success' | 'info' | 'warning' | 'danger'> = {
     car: 'primary',
     truck: 'warning',
     motorcycle: 'info',
+    bus: 'success',
+    bicycle: 'info',
     other: 'success'
   }
   return typeMap[type] || 'info'
@@ -268,68 +412,103 @@ const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: numbe
   return R * c
 }
 
-const initMap = () => {
+const initMap = async () => {
   if (!mapInstance.value) {
+    // 确保DOM元素存在
+    await nextTick()
+    
+    const mapElement = document.getElementById('tracking-map')
+    if (!mapElement) {
+      console.error('地图容器不存在')
+      return
+    }
+    
+    // 如果地图已经存在，先移除
+    if (mapInstance.value) {
+      mapInstance.value.remove()
+    }
+    
     mapInstance.value = L.map('tracking-map').setView([34.7466, 113.6253], 12)
     
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors'
     }).addTo(mapInstance.value)
+    
+    console.log('地图初始化完成')
   }
 }
 
-const searchVehicle = async () => {
-  if (!searchForm.plateNumber) {
-    ElMessage.warning('请输入车牌号')
+const loadVehicleInfo = async () => {
+  const vehicleId = route.query.vehicleId as string
+  const plateNumber = route.query.plateNumber as string
+  
+  // 检查参数是否存在且不为空字符串
+  if ((!vehicleId || vehicleId.trim() === '') && (!plateNumber || plateNumber.trim() === '')) {
+    ElMessage.error('缺少车辆参数')
+    router.push('/vehicles')
     return
   }
   
   try {
-    // 从后端获取车辆信息
-    const vehicles = await vehicleStore.fetchVehicles({ search: searchForm.plateNumber })
-    if (vehicles.vehicles.length === 0) {
-      ElMessage.error('未找到该车辆')
-      return
+    if (vehicleId) {
+      // 根据车辆ID获取车辆信息
+      const vehicle = await vehicleStore.fetchVehicle(vehicleId)
+      vehicleInfo.value = vehicle
+    } else if (plateNumber) {
+      // 根据车牌号查找车辆信息
+      const response = await vehicleStore.fetchVehicles({ search: plateNumber })
+      if (response.vehicles && response.vehicles.length > 0) {
+        vehicleInfo.value = response.vehicles[0]
+      } else {
+        ElMessage.error('未找到该车辆')
+        router.push('/vehicles')
+        return
+      }
     }
-    
-    const vehicle = vehicles.vehicles[0]
-    selectedVehicle.value = vehicle
-    
-    // 获取车辆轨迹
-    const tracks = await vehicleStore.fetchVehicleTracks(vehicle.id)
-    trajectoryPoints.value = tracks.map(track => ({
-      lat: track.latitude,
-      lng: track.longitude,
-      timestamp: track.detectedAt,
-      speed: track.speed,
-      direction: track.direction,
-      location: track.cameraId
-    }))
-    
-    drawTrajectory()
-    ElMessage.success('找到车辆轨迹')
   } catch (error) {
-    console.error('搜索车辆失败:', error)
-    ElMessage.error('搜索车辆失败')
+    console.error('加载车辆信息失败:', error)
+    ElMessage.error('加载车辆信息失败')
+    router.push('/vehicles')
   }
 }
 
-const clearSearch = () => {
-  searchForm.plateNumber = ''
-  searchForm.dateRange = null
-  selectedVehicle.value = null
-  trajectoryPoints.value = []
-  if (mapInstance.value) {
-    mapInstance.value.eachLayer((layer: any) => {
-      if (layer instanceof L.Marker || layer instanceof L.Polyline) {
-        mapInstance.value.removeLayer(layer)
-      }
-    })
+const loadTracks = async () => {
+  // 获取车辆ID，优先使用vehicleInfo，否则使用路由参数
+  const vehicleId = vehicleInfo.value?.id || route.query.vehicleId as string
+  
+  if (!vehicleId) {
+    ElMessage.error('无法获取车辆ID')
+    return
+  }
+  
+  try {
+    loading.value = true
+    const params: any = {
+      limit: trackingParams.limit
+    }
+    
+    if (trackingParams.dateRange && trackingParams.dateRange.length === 2) {
+      params.start_time = trackingParams.dateRange[0]
+      params.end_time = trackingParams.dateRange[1]
+    }
+    
+    const trackData = await vehicleStore.fetchVehicleTracks(vehicleId, params)
+    tracks.value = trackData
+    
+    // 绘制轨迹
+    drawTrajectory()
+    
+    ElMessage.success(`加载了 ${trackData.length} 个轨迹点`)
+  } catch (error) {
+    console.error('加载轨迹失败:', error)
+    ElMessage.error('加载轨迹失败')
+  } finally {
+    loading.value = false
   }
 }
 
 const drawTrajectory = () => {
-  if (!mapInstance.value || trajectoryPoints.value.length === 0) return
+  if (!mapInstance.value || tracks.value.length === 0) return
   
   // 清除之前的轨迹
   mapInstance.value.eachLayer((layer: any) => {
@@ -339,7 +518,7 @@ const drawTrajectory = () => {
   })
   
   // 绘制轨迹线
-  const latlngs = trajectoryPoints.value.map(point => [point.lat, point.lng])
+  const latlngs = tracks.value.map(track => [track.latitude, track.longitude])
   const polyline = L.polyline(latlngs, {
     color: '#409eff',
     weight: 4,
@@ -347,10 +526,10 @@ const drawTrajectory = () => {
   }).addTo(mapInstance.value)
   
   // 添加起点和终点标记
-  const startPoint = trajectoryPoints.value[0]
-  const endPoint = trajectoryPoints.value[trajectoryPoints.value.length - 1]
+  const startPoint = tracks.value[0]
+  const endPoint = tracks.value[tracks.value.length - 1]
   
-  L.marker([startPoint.lat, startPoint.lng], {
+  L.marker([startPoint.latitude, startPoint.longitude], {
     icon: L.divIcon({
       className: 'start-marker',
       html: '<div style="background: #67c23a; color: white; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 12px;">起</div>',
@@ -358,7 +537,7 @@ const drawTrajectory = () => {
     })
   }).addTo(mapInstance.value)
   
-  L.marker([endPoint.lat, endPoint.lng], {
+  L.marker([endPoint.latitude, endPoint.longitude], {
     icon: L.divIcon({
       className: 'end-marker',
       html: '<div style="background: #f56c6c; color: white; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 12px;">终</div>',
@@ -367,9 +546,9 @@ const drawTrajectory = () => {
   }).addTo(mapInstance.value)
   
   // 添加中间点标记
-  trajectoryPoints.value.forEach((point, index) => {
-    if (index > 0 && index < trajectoryPoints.value.length - 1) {
-      L.marker([point.lat, point.lng], {
+  tracks.value.forEach((track, index) => {
+    if (index > 0 && index < tracks.value.length - 1) {
+      L.marker([track.latitude, track.longitude], {
         icon: L.divIcon({
           className: 'waypoint-marker',
           html: `<div style="background: #409eff; color: white; border-radius: 50%; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; font-size: 10px;">${index}</div>`,
@@ -384,27 +563,27 @@ const drawTrajectory = () => {
 }
 
 const fitBounds = () => {
-  if (mapInstance.value && trajectoryPoints.value.length > 0) {
-    const bounds = L.latLngBounds(trajectoryPoints.value.map(point => [point.lat, point.lng]))
+  if (mapInstance.value && tracks.value.length > 0) {
+    const bounds = L.latLngBounds(tracks.value.map(track => [track.latitude, track.longitude]))
     mapInstance.value.fitBounds(bounds, { padding: [20, 20] })
   }
 }
 
 const playTrajectory = () => {
-  if (trajectoryPoints.value.length === 0) return
+  if (tracks.value.length === 0) return
   
   isPlaying.value = true
   let currentIndex = 0
   
-  playInterval.value = setInterval(() => {
-    if (currentIndex < trajectoryPoints.value.length) {
-      const point = trajectoryPoints.value[currentIndex]
+  playbackTimer.value = setInterval(() => {
+    if (currentIndex < tracks.value.length) {
+      const track = tracks.value[currentIndex]
       
       // 移动地图中心到当前点
-      mapInstance.value.setView([point.lat, point.lng], 16)
+      mapInstance.value.setView([track.latitude, track.longitude], 16)
       
       // 添加当前位置标记
-      L.marker([point.lat, point.lng], {
+      L.marker([track.latitude, track.longitude], {
         icon: L.divIcon({
           className: 'current-marker',
           html: '<div style="background: #e6a23c; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 12px; animation: pulse 1s infinite;">●</div>',
@@ -421,15 +600,15 @@ const playTrajectory = () => {
 
 const pauseTrajectory = () => {
   isPlaying.value = false
-  if (playInterval.value) {
-    clearInterval(playInterval.value)
-    playInterval.value = null
+  if (playbackTimer.value) {
+    clearInterval(playbackTimer.value)
+    playbackTimer.value = null
   }
 }
 
-const refreshTracking = () => {
-  if (selectedVehicle.value) {
-    drawTrajectory()
+const refreshTracks = async () => {
+  if (vehicleInfo.value) {
+    await loadTracks()
     ElMessage.success('轨迹已刷新')
   } else {
     ElMessage.info('请先选择车辆')
@@ -437,24 +616,141 @@ const refreshTracking = () => {
 }
 
 const exportTrajectory = () => {
-  if (selectedVehicle.value) {
-    ElMessage.info('导出功能开发中...')
+  if (vehicleInfo.value && tracks.value.length > 0) {
+    // 导出轨迹数据为CSV
+    const csvContent = [
+      ['时间', '纬度', '经度', '速度(km/h)', '方向(度)', '置信度'],
+      ...tracks.value.map(track => [
+        formatTime(track.detectedAt),
+        track.latitude,
+        track.longitude,
+        track.speed || 0,
+        track.direction || 0,
+        Math.round((track.confidence || 0) * 100)
+      ])
+    ].map(row => row.join(',')).join('\n')
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `轨迹数据_${vehicleInfo.value.plateNumber}_${new Date().toISOString().split('T')[0]}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    
+    ElMessage.success('轨迹数据已导出')
   } else {
-    ElMessage.info('请先选择车辆')
+    ElMessage.info('没有可导出的轨迹数据')
   }
 }
 
-onMounted(() => {
-  nextTick(() => {
-    initMap()
+const goToTrack = (index: number) => {
+  if (mapInstance.value && tracks.value[index]) {
+    const track = tracks.value[index]
+    mapInstance.value.setView([track.latitude, track.longitude], 16)
     
-    // 从URL参数获取车牌号
-    const plateNumber = route.query.plateNumber as string
-    if (plateNumber) {
-      searchForm.plateNumber = plateNumber
-      searchVehicle()
-    }
-  })
+    // 添加高亮标记
+    L.marker([track.latitude, track.longitude], {
+      icon: L.divIcon({
+        className: 'highlight-marker',
+        html: '<div style="background: #e6a23c; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 12px; border: 2px solid #fff;">●</div>',
+        iconSize: [24, 24]
+      })
+    }).addTo(mapInstance.value)
+    
+    ElMessage.success(`已定位到第 ${index + 1} 个轨迹点`)
+  }
+}
+
+const viewImage = (track: any) => {
+  if (track.imageUrl) {
+    selectedImage.value = track
+    showImageDialog.value = true
+  } else {
+    ElMessage.info('该轨迹点没有图片')
+  }
+}
+
+const goBack = () => {
+  router.push('/vehicles')
+}
+
+// 车辆选择相关方法
+const loadVehicleList = async () => {
+  try {
+    vehicleListLoading.value = true
+    const response = await vehicleStore.fetchVehicles({ page: 1, per_page: 50 })
+    vehicleList.value = response.vehicles || []
+  } catch (error) {
+    console.error('加载车辆列表失败:', error)
+    ElMessage.error('加载车辆列表失败')
+  } finally {
+    vehicleListLoading.value = false
+  }
+}
+
+const selectVehicle = async () => {
+  if (!selectedVehicleId.value) {
+    ElMessage.warning('请选择车辆')
+    return
+  }
+  
+  try {
+    // 更新URL参数
+    await router.push({
+      path: '/vehicles/tracking',
+      query: {
+        vehicleId: selectedVehicleId.value,
+        plateNumber: vehicleList.value.find(v => v.id === selectedVehicleId.value)?.plateNumber || ''
+      }
+    })
+    
+    // 重新加载页面数据
+    showVehicleSelector.value = false
+    await loadVehicleInfo()
+    
+    // 确保地图初始化
+    await nextTick()
+    setTimeout(async () => {
+      await initMap()
+      
+      // 延迟加载轨迹
+      setTimeout(async () => {
+        await loadTracks()
+      }, 200)
+    }, 100)
+  } catch (error) {
+    console.error('选择车辆失败:', error)
+    ElMessage.error('选择车辆失败')
+  }
+}
+
+onMounted(async () => {
+  // 立即检查参数
+  const vehicleId = route.query.vehicleId as string
+  const plateNumber = route.query.plateNumber as string
+  
+  if (!vehicleId && !plateNumber) {
+    // 没有车辆参数，显示车辆选择界面
+    showVehicleSelector.value = true
+    await loadVehicleList()
+    return
+  }
+  
+  await loadVehicleInfo()
+  
+  // 初始化地图 - 确保在DOM更新后
+  await nextTick()
+  setTimeout(async () => {
+    await initMap()
+    
+    // 延迟加载轨迹，确保地图和vehicleInfo都已准备好
+    setTimeout(async () => {
+      await loadTracks()
+    }, 200)
+  }, 100)
 })
 
 onUnmounted(() => {
@@ -485,14 +781,14 @@ onUnmounted(() => {
   background: var(--bg-color);
 }
 
-.vehicle-tracking-header {
+.tracking-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
 }
 
-.vehicle-tracking-header h1 {
+.tracking-header h1 {
   color: var(--text-color);
   margin: 0;
 }
@@ -502,23 +798,27 @@ onUnmounted(() => {
   gap: 10px;
 }
 
-.vehicle-tracking-content-wrapper {
+.tracking-content {
   max-width: 1400px;
 }
 
-.vehicle-selector {
+.info-controls-row {
   margin-bottom: 20px;
 }
 
-.tracking-main {
-  margin-bottom: 20px;
-}
-
+.vehicle-info-card,
+.tracking-controls,
 .map-card,
 .info-card,
 .points-card {
   background: var(--bg-color-light);
   border: 1px solid var(--border-color);
+  margin-bottom: 20px;
+}
+
+.info-controls-row .vehicle-info-card,
+.info-controls-row .tracking-controls {
+  margin-bottom: 0;
 }
 
 .card-header {
@@ -536,31 +836,34 @@ onUnmounted(() => {
   margin-bottom: 20px;
 }
 
+.info-item {
+  display: flex;
+  margin-bottom: 10px;
+}
+
+.info-item label {
+  font-weight: bold;
+  margin-right: 10px;
+  min-width: 80px;
+}
+
 .no-vehicle {
   text-align: center;
   padding: 40px 0;
 }
 
-.points-list {
-  max-height: 400px;
-  overflow-y: auto;
+
+.image-preview {
+  text-align: center;
 }
 
-.point-info {
-  padding: 5px 0;
+.image-info {
+  margin-top: 15px;
+  text-align: left;
 }
 
-.point-location {
-  font-weight: bold;
-  color: var(--text-color);
-  margin-bottom: 5px;
-}
-
-.point-details {
-  font-size: 12px;
-  color: var(--text-color-light);
-  display: flex;
-  gap: 15px;
+.image-info p {
+  margin: 5px 0;
 }
 
 :deep(.el-card__header) {

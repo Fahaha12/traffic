@@ -73,27 +73,36 @@ def create_vehicle():
     try:
         data = request.get_json()
         
+        # 字段名映射：前端驼峰命名 -> 后端下划线命名
+        plate_number = data.get('plateNumber') or data.get('plate_number')
+        vehicle_type = data.get('vehicleType') or data.get('vehicle_type')
+        color = data.get('color')
+        brand = data.get('brand')
+        model = data.get('model')
+        is_suspicious = data.get('isSuspicious', data.get('is_suspicious', False))
+        risk_level = data.get('riskLevel', data.get('risk_level', 'low'))
+        
         # 验证必填字段
-        required_fields = ['plate_number', 'vehicle_type']
-        validation_error = validate_required_fields(data, required_fields)
-        if validation_error:
-            return jsonify({'error': validation_error}), 400
+        if not plate_number:
+            return jsonify({'error': '缺少必填字段: plateNumber'}), 400
+        if not vehicle_type:
+            return jsonify({'error': '缺少必填字段: vehicleType'}), 400
         
         # 检查车牌号是否已存在
-        existing_vehicle = Vehicle.query.filter_by(plate_number=data['plate_number']).first()
+        existing_vehicle = Vehicle.query.filter_by(plate_number=plate_number).first()
         if existing_vehicle:
             return jsonify({'error': '车牌号已存在'}), 400
         
         # 创建车辆
         vehicle = Vehicle(
             id=generate_id(),
-            plate_number=data['plate_number'],
-            vehicle_type=data['vehicle_type'],
-            color=data.get('color'),
-            brand=data.get('brand'),
-            model=data.get('model'),
-            is_suspicious=data.get('is_suspicious', False),
-            risk_level=data.get('risk_level', 'low'),
+            plate_number=plate_number,
+            vehicle_type=vehicle_type,
+            color=color,
+            brand=brand,
+            model=model,
+            is_suspicious=is_suspicious,
+            risk_level=risk_level,
             created_at=datetime.utcnow()
         )
         
@@ -120,29 +129,38 @@ def update_vehicle(vehicle_id):
         
         data = request.get_json()
         
+        # 字段名映射：前端驼峰命名 -> 后端下划线命名
+        plate_number = data.get('plateNumber') or data.get('plate_number')
+        vehicle_type = data.get('vehicleType') or data.get('vehicle_type')
+        color = data.get('color')
+        brand = data.get('brand')
+        model = data.get('model')
+        is_suspicious = data.get('isSuspicious')
+        risk_level = data.get('riskLevel') or data.get('risk_level')
+        
         # 更新字段
-        if 'plate_number' in data:
+        if plate_number is not None:
             # 检查车牌号是否与其他车辆重复
             existing_vehicle = Vehicle.query.filter(
-                Vehicle.plate_number == data['plate_number'],
+                Vehicle.plate_number == plate_number,
                 Vehicle.id != vehicle_id
             ).first()
             if existing_vehicle:
                 return jsonify({'error': '车牌号已存在'}), 400
-            vehicle.plate_number = data['plate_number']
+            vehicle.plate_number = plate_number
         
-        if 'vehicle_type' in data:
-            vehicle.vehicle_type = data['vehicle_type']
-        if 'color' in data:
-            vehicle.color = data['color']
-        if 'brand' in data:
-            vehicle.brand = data['brand']
-        if 'model' in data:
-            vehicle.model = data['model']
-        if 'is_suspicious' in data:
-            vehicle.is_suspicious = data['is_suspicious']
-        if 'risk_level' in data:
-            vehicle.risk_level = data['risk_level']
+        if vehicle_type is not None:
+            vehicle.vehicle_type = vehicle_type
+        if color is not None:
+            vehicle.color = color
+        if brand is not None:
+            vehicle.brand = brand
+        if model is not None:
+            vehicle.model = model
+        if is_suspicious is not None:
+            vehicle.is_suspicious = is_suspicious
+        if risk_level is not None:
+            vehicle.risk_level = risk_level
         
         db.session.commit()
         
@@ -199,12 +217,13 @@ def mark_vehicle_suspicious(vehicle_id):
             return jsonify({'error': '车辆不存在'}), 404
         
         data = request.get_json()
-        is_suspicious = data.get('is_suspicious', True)
+        is_suspicious = data.get('isSuspicious', data.get('is_suspicious', True))
         reason = data.get('reason', '')
+        risk_level = data.get('riskLevel', data.get('risk_level', 'high'))
         
         vehicle.is_suspicious = is_suspicious
         if is_suspicious:
-            vehicle.risk_level = data.get('risk_level', 'high')
+            vehicle.risk_level = risk_level
         
         db.session.commit()
         

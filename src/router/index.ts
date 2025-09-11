@@ -81,6 +81,10 @@ const router = createRouter({
     },
     // 车辆管理路由
     {
+      path: '/vehicles',
+      redirect: '/vehicles/list'
+    },
+    {
       path: '/vehicles/list',
       name: 'VehicleList',
       component: () => import('@/views/VehicleList.vue'),

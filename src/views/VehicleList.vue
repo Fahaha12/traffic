@@ -7,6 +7,10 @@
         <div class="vehicle-list-header">
           <h1>车辆列表</h1>
           <div class="header-actions">
+            <el-button type="primary" @click="showCreateDialog">
+              <el-icon><Plus /></el-icon>
+              添加车辆
+            </el-button>
             <el-button type="primary" @click="refreshVehicles">
               <el-icon><Refresh /></el-icon>
               刷新
@@ -79,6 +83,18 @@
               <template #header>
                 <div class="card-header">
                   <span>车辆列表 ({{ totalVehicles }} 辆)</span>
+                  <div class="batch-actions" v-if="selectedVehicles.length > 0">
+                    <span class="selected-count">已选择 {{ selectedVehicles.length }} 项</span>
+                    <el-button size="small" @click="batchMarkSuspicious">
+                      批量标记可疑
+                    </el-button>
+                    <el-button size="small" @click="batchCancelSuspicious">
+                      批量取消标记
+                    </el-button>
+                    <el-button size="small" type="danger" @click="batchDelete">
+                      批量删除
+                    </el-button>
+                  </div>
                 </div>
               </template>
               
@@ -87,7 +103,9 @@
                 :loading="loading"
                 style="width: 100%"
                 @row-click="handleVehicleClick"
+                @selection-change="handleSelectionChange"
               >
+                <el-table-column type="selection" width="55" />
                 <el-table-column prop="plateNumber" label="车牌号" width="120" />
                 
                 <el-table-column prop="vehicleType" label="车辆类型" width="100">
@@ -130,8 +148,11 @@
                 
                 <el-table-column prop="detectionCount" label="检测次数" width="100" />
                 
-                <el-table-column label="操作" width="250" fixed="right">
+                <el-table-column label="操作" width="300" fixed="right">
                   <template #default="{ row }">
+                    <el-button type="text" size="small" @click.stop="editVehicle(row)">
+                      编辑
+                    </el-button>
                     <el-button type="text" size="small" @click.stop="viewTrajectory(row)">
                       轨迹
                     </el-button>
@@ -176,6 +197,76 @@
       </div>
     </div>
     
+    <!-- 车辆创建/编辑对话框 -->
+    <el-dialog
+      v-model="showCreateEditDialog"
+      :title="isEditMode ? `编辑车辆 - ${formData.plateNumber}` : '添加车辆'"
+      width="600px"
+      @close="resetForm"
+    >
+      <el-form
+        ref="formRef"
+        :model="formData"
+        :rules="formRules"
+        label-width="100px"
+        label-position="left"
+      >
+        <el-form-item label="车牌号" prop="plateNumber">
+          <el-input
+            v-model="formData.plateNumber"
+            placeholder="请输入车牌号"
+            :disabled="isEditMode"
+          />
+        </el-form-item>
+        
+        <el-form-item label="车辆类型" prop="vehicleType">
+          <el-select v-model="formData.vehicleType" placeholder="请选择车辆类型" style="width: 100%">
+            <el-option label="小型汽车" value="car" />
+            <el-option label="大型汽车" value="truck" />
+            <el-option label="公交车" value="bus" />
+            <el-option label="摩托车" value="motorcycle" />
+            <el-option label="自行车" value="bicycle" />
+            <el-option label="其他" value="other" />
+          </el-select>
+        </el-form-item>
+        
+        <el-form-item label="颜色" prop="color">
+          <el-input v-model="formData.color" placeholder="请输入车辆颜色" />
+        </el-form-item>
+        
+        <el-form-item label="品牌" prop="brand">
+          <el-input v-model="formData.brand" placeholder="请输入车辆品牌" />
+        </el-form-item>
+        
+        <el-form-item label="型号" prop="model">
+          <el-input v-model="formData.model" placeholder="请输入车辆型号" />
+        </el-form-item>
+        
+        <el-form-item label="状态" prop="isSuspicious">
+          <el-radio-group v-model="formData.isSuspicious">
+            <el-radio :label="false">正常</el-radio>
+            <el-radio :label="true">可疑</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        
+        <el-form-item label="风险等级" prop="riskLevel" v-if="formData.isSuspicious">
+          <el-select v-model="formData.riskLevel" placeholder="请选择风险等级" style="width: 100%">
+            <el-option label="低风险" value="low" />
+            <el-option label="中风险" value="medium" />
+            <el-option label="高风险" value="high" />
+            <el-option label="严重" value="critical" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      
+      <template #footer>
+        <el-button @click="showCreateEditDialog = false">取消</el-button>
+        <el-button type="primary" @click="submitForm" :loading="formLoading">
+          {{ isEditMode ? '更新' : '创建' }}
+        </el-button>
+      </template>
+    </el-dialog>
+    
     <!-- 车辆详情对话框 -->
     <el-dialog
       v-model="showDetailDialog"
@@ -193,30 +284,35 @@
             </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="颜色">
-            {{ selectedVehicle.color }}
+            {{ selectedVehicle.color || '未知' }}
           </el-descriptions-item>
           <el-descriptions-item label="品牌">
-            {{ selectedVehicle.brand }}
+            {{ selectedVehicle.brand || '未知' }}
           </el-descriptions-item>
           <el-descriptions-item label="型号">
-            {{ selectedVehicle.model }}
+            {{ selectedVehicle.model || '未知' }}
           </el-descriptions-item>
           <el-descriptions-item label="状态">
-            <el-tag :type="getStatusTagType(selectedVehicle.status)" size="small">
-              {{ getStatusText(selectedVehicle.status) }}
+            <el-tag :type="selectedVehicle.isSuspicious ? 'warning' : 'success'" size="small">
+              {{ selectedVehicle.isSuspicious ? '可疑' : '正常' }}
             </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="风险等级" v-if="selectedVehicle.isSuspicious">
+            <el-tag :type="getRiskLevelType(selectedVehicle.riskLevel)" size="small">
+              {{ getRiskLevelText(selectedVehicle.riskLevel) }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="创建时间">
+            {{ formatTime(selectedVehicle.createdAt) }}
           </el-descriptions-item>
           <el-descriptions-item label="最后出现时间">
             {{ formatTime(selectedVehicle.lastSeen) }}
           </el-descriptions-item>
           <el-descriptions-item label="最后位置">
-            {{ selectedVehicle.location }}
+            {{ selectedVehicle.location || '未知' }}
           </el-descriptions-item>
           <el-descriptions-item label="检测次数">
-            {{ selectedVehicle.detectionCount }}
-          </el-descriptions-item>
-          <el-descriptions-item label="首次检测">
-            {{ formatTime(selectedVehicle.firstSeen) }}
+            {{ selectedVehicle.detectionCount || 0 }}
           </el-descriptions-item>
         </el-descriptions>
         
@@ -226,7 +322,7 @@
             <div v-for="image in selectedVehicle.images" :key="image.id" class="image-item">
               <el-image
                 :src="image.url"
-                :preview-src-list="selectedVehicle.images.map(img => img.url)"
+                :preview-src-list="selectedVehicle.images.map((img: any) => img.url)"
                 fit="cover"
                 style="width: 100px; height: 100px"
               />
@@ -256,7 +352,8 @@ import { useVehicleStore } from '@/stores/vehicle'
 import LayoutHeader from '@/components/Layout/Header.vue'
 import LayoutSidebar from '@/components/Layout/Sidebar.vue'
 import { dateUtils } from '@/utils/dateUtils'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox, ElForm } from 'element-plus'
+import { Plus, Refresh, Download } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -281,7 +378,38 @@ const filters = reactive({
 })
 
 const showDetailDialog = ref(false)
+const showCreateEditDialog = ref(false)
 const selectedVehicle = ref<any>(null)
+const selectedVehicles = ref<any[]>([])
+const isEditMode = ref(false)
+const formLoading = ref(false)
+const formRef = ref<InstanceType<typeof ElForm>>()
+
+// 表单数据
+const formData = reactive({
+  id: '',
+  plateNumber: '',
+  vehicleType: '',
+  color: '',
+  brand: '',
+  model: '',
+  isSuspicious: false,
+  riskLevel: 'low'
+})
+
+// 表单验证规则
+const formRules = {
+  plateNumber: [
+    { required: true, message: '请输入车牌号', trigger: 'blur' },
+    { pattern: /^[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼使领A-Z]{1}[A-Z]{1}[A-Z0-9]{4}[A-Z0-9挂学警港澳]{1}$/, message: '请输入正确的车牌号格式', trigger: 'blur' }
+  ],
+  vehicleType: [
+    { required: true, message: '请选择车辆类型', trigger: 'change' }
+  ],
+  riskLevel: [
+    { required: true, message: '请选择风险等级', trigger: 'change' }
+  ]
+}
 
 // 计算属性
 const totalVehicles = computed(() => pagination.value.total)
@@ -303,8 +431,8 @@ const getVehicleTypeText = (type: string) => {
   return typeMap[type] || type
 }
 
-const getVehicleTypeTagType = (type: string) => {
-  const typeMap: Record<string, string> = {
+const getVehicleTypeTagType = (type: string): 'primary' | 'success' | 'warning' | 'info' | 'danger' => {
+  const typeMap: Record<string, 'primary' | 'success' | 'warning' | 'info' | 'danger'> = {
     car: 'primary',
     truck: 'warning',
     motorcycle: 'info',
@@ -343,8 +471,8 @@ const getRiskLevelText = (level: string) => {
   return levelMap[level] || level
 }
 
-const getRiskLevelType = (level: string) => {
-  const typeMap: Record<string, string> = {
+const getRiskLevelType = (level: string): 'primary' | 'success' | 'warning' | 'info' | 'danger' => {
+  const typeMap: Record<string, 'primary' | 'success' | 'warning' | 'info' | 'danger'> = {
     low: 'success',
     medium: 'warning',
     high: 'danger',
@@ -408,8 +536,51 @@ const refreshVehicles = async () => {
   ElMessage.success('车辆列表已刷新')
 }
 
-const exportVehicles = () => {
-  ElMessage.info('导出功能开发中...')
+const exportVehicles = async () => {
+  try {
+    const response = await vehicleStore.fetchVehicles({
+      page: 1,
+      per_page: 10000, // 导出所有数据
+      search: filters.plateNumber,
+      type: filters.vehicleType,
+      is_suspicious: filters.status === 'suspicious' ? 'true' : filters.status === 'normal' ? 'false' : undefined,
+      risk_level: filters.riskLevel
+    })
+    
+    const vehicles = response.vehicles || []
+    
+    // 转换为CSV格式
+    const headers = ['车牌号', '车辆类型', '颜色', '品牌', '型号', '状态', '风险等级', '创建时间']
+    const csvContent = [
+      headers.join(','),
+      ...vehicles.map((vehicle: any) => [
+        vehicle.plateNumber,
+        getVehicleTypeText(vehicle.vehicleType),
+        vehicle.color || '',
+        vehicle.brand || '',
+        vehicle.model || '',
+        vehicle.isSuspicious ? '可疑' : '正常',
+        vehicle.isSuspicious ? getRiskLevelText(vehicle.riskLevel) : '',
+        formatTime(vehicle.createdAt)
+      ].join(','))
+    ].join('\n')
+    
+    // 创建下载链接
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `车辆列表_${new Date().toISOString().split('T')[0]}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    
+    ElMessage.success(`已导出 ${vehicles.length} 条车辆记录`)
+  } catch (error) {
+    console.error('导出失败:', error)
+    ElMessage.error('导出失败')
+  }
 }
 
 const handleVehicleClick = (row: any) => {
@@ -423,8 +594,10 @@ const viewDetails = (vehicle: any) => {
 }
 
 const viewTrajectory = (vehicle: any) => {
-  if (vehicle) {
-    router.push(`/vehicles/tracking?plateNumber=${vehicle.plateNumber}`)
+  if (vehicle && vehicle.id) {
+    router.push(`/vehicles/tracking?vehicleId=${vehicle.id}&plateNumber=${vehicle.plateNumber}`)
+  } else {
+    ElMessage.error('车辆数据无效')
   }
 }
 
@@ -485,7 +658,174 @@ const handlePageChange = (page: number) => {
 }
 
 const handleCurrentChange = (page: number) => {
-  currentPage.value = page
+  pagination.value.page = page
+  loadVehicles()
+}
+
+// 批量操作相关方法
+const handleSelectionChange = (selection: any[]) => {
+  selectedVehicles.value = selection
+}
+
+const batchMarkSuspicious = async () => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要将选中的 ${selectedVehicles.value.length} 辆车标记为可疑吗？`,
+      '批量标记可疑',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    const promises = selectedVehicles.value.map(vehicle => 
+      vehicleStore.markVehicleSuspicious(vehicle.id, {
+        isSuspicious: true,
+        riskLevel: 'medium'
+      })
+    )
+    
+    await Promise.all(promises)
+    ElMessage.success(`已成功标记 ${selectedVehicles.value.length} 辆车为可疑`)
+    selectedVehicles.value = []
+    await loadVehicles()
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('批量标记可疑失败:', error)
+      ElMessage.error('批量标记可疑失败')
+    }
+  }
+}
+
+const batchCancelSuspicious = async () => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要取消选中 ${selectedVehicles.value.length} 辆车的可疑标记吗？`,
+      '批量取消标记',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    const promises = selectedVehicles.value.map(vehicle => 
+      vehicleStore.markVehicleSuspicious(vehicle.id, {
+        isSuspicious: false,
+        riskLevel: 'low'
+      })
+    )
+    
+    await Promise.all(promises)
+    ElMessage.success(`已成功取消 ${selectedVehicles.value.length} 辆车的可疑标记`)
+    selectedVehicles.value = []
+    await loadVehicles()
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('批量取消标记失败:', error)
+      ElMessage.error('批量取消标记失败')
+    }
+  }
+}
+
+const batchDelete = async () => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除选中的 ${selectedVehicles.value.length} 辆车吗？此操作不可恢复！`,
+      '批量删除',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    const promises = selectedVehicles.value.map(vehicle => 
+      vehicleStore.deleteVehicle(vehicle.id)
+    )
+    
+    await Promise.all(promises)
+    ElMessage.success(`已成功删除 ${selectedVehicles.value.length} 辆车`)
+    selectedVehicles.value = []
+    await loadVehicles()
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('批量删除失败:', error)
+      ElMessage.error('批量删除失败')
+    }
+  }
+}
+
+// 表单相关方法
+const showCreateDialog = () => {
+  isEditMode.value = false
+  resetForm()
+  showCreateEditDialog.value = true
+}
+
+const editVehicle = (vehicle: any) => {
+  isEditMode.value = true
+  Object.assign(formData, {
+    id: vehicle.id,
+    plateNumber: vehicle.plateNumber,
+    vehicleType: vehicle.vehicleType,
+    color: vehicle.color || '',
+    brand: vehicle.brand || '',
+    model: vehicle.model || '',
+    isSuspicious: vehicle.isSuspicious || false,
+    riskLevel: vehicle.riskLevel || 'low'
+  })
+  showCreateEditDialog.value = true
+}
+
+const resetForm = () => {
+  Object.assign(formData, {
+    id: '',
+    plateNumber: '',
+    vehicleType: '',
+    color: '',
+    brand: '',
+    model: '',
+    isSuspicious: false,
+    riskLevel: 'low'
+  })
+  formRef.value?.clearValidate()
+}
+
+const submitForm = async () => {
+  if (!formRef.value) return
+  
+  try {
+    await formRef.value.validate()
+    formLoading.value = true
+    
+    const vehicleData = {
+      plateNumber: formData.plateNumber,
+      vehicleType: formData.vehicleType,
+      color: formData.color,
+      brand: formData.brand,
+      model: formData.model,
+      isSuspicious: formData.isSuspicious,
+      riskLevel: formData.isSuspicious ? formData.riskLevel : 'low'
+    }
+    
+    if (isEditMode.value) {
+      await vehicleStore.updateVehicle(formData.id, vehicleData)
+      ElMessage.success('车辆更新成功')
+    } else {
+      await vehicleStore.createVehicle(vehicleData)
+      ElMessage.success('车辆创建成功')
+    }
+    
+    showCreateEditDialog.value = false
+    await loadVehicles()
+  } catch (error) {
+    console.error('提交表单失败:', error)
+    ElMessage.error(isEditMode.value ? '更新车辆失败' : '创建车辆失败')
+  } finally {
+    formLoading.value = false
+  }
 }
 
 onMounted(() => {
@@ -546,6 +886,18 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.batch-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.selected-count {
+  color: var(--text-color-light);
+  font-size: 14px;
+  margin-right: 10px;
 }
 
 .vehicle-detail {

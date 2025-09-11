@@ -91,8 +91,9 @@ export const useVehicleStore = defineStore('vehicle', () => {
   const createVehicle = async (vehicleData: any) => {
     try {
       const response = await vehicleAPI.createVehicle(vehicleData)
-      addVehicle(response.data)
-      return response.data
+      const vehicle = response.data.vehicle || response.data
+      addVehicle(vehicle)
+      return vehicle
     } catch (error) {
       console.error('创建车辆失败:', error)
       throw error
@@ -102,8 +103,9 @@ export const useVehicleStore = defineStore('vehicle', () => {
   const updateVehicle = async (vehicleId: string, vehicleData: any) => {
     try {
       const response = await vehicleAPI.updateVehicle(vehicleId, vehicleData)
-      addVehicle(response.data)
-      return response.data
+      const vehicle = response.data.vehicle || response.data
+      addVehicle(vehicle)
+      return vehicle
     } catch (error) {
       console.error('更新车辆失败:', error)
       throw error
@@ -143,8 +145,9 @@ export const useVehicleStore = defineStore('vehicle', () => {
   const markVehicleSuspicious = async (vehicleId: string, data: any) => {
     try {
       const response = await vehicleAPI.markSuspicious(vehicleId, data)
-      addVehicle(response.data)
-      return response.data
+      const vehicle = response.data.vehicle || response.data
+      addVehicle(vehicle)
+      return vehicle
     } catch (error) {
       console.error('标记可疑车辆失败:', error)
       throw error
