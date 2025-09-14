@@ -178,24 +178,24 @@
               </template>
               
               <el-table :data="tracks" style="width: 100%" max-height="400">
-                <el-table-column prop="detectedAt" label="检测时间" width="180">
+                <el-table-column prop="detectedAt" label="检测时间" width="200">
                   <template #default="{ row }">
                     {{ formatTime(row.detectedAt) }}
                   </template>
                 </el-table-column>
-                <el-table-column prop="latitude" label="纬度" width="120" />
-                <el-table-column prop="longitude" label="经度" width="120" />
-                <el-table-column prop="speed" label="速度" width="80">
+                <el-table-column prop="latitude" label="纬度" width="150" />
+                <el-table-column prop="longitude" label="经度" width="150" />
+                <el-table-column prop="speed" label="速度" width="120">
                   <template #default="{ row }">
                     {{ row.speed || 0 }} km/h
                   </template>
                 </el-table-column>
-                <el-table-column prop="direction" label="方向" width="80">
+                <el-table-column prop="direction" label="方向" width="120">
                   <template #default="{ row }">
                     {{ row.direction || 0 }}°
                   </template>
                 </el-table-column>
-                <el-table-column prop="confidence" label="置信度" width="100">
+                <el-table-column prop="confidence" label="置信度" width="150">
                   <template #default="{ row }">
                     <el-progress
                       :percentage="Math.round((row.confidence || 0) * 100)"
@@ -204,7 +204,12 @@
                     />
                   </template>
                 </el-table-column>
-                <el-table-column label="操作" width="120">
+                <el-table-column prop="cameraId" label="摄像头ID" width="180">
+                  <template #default="{ row }">
+                    {{ row.cameraId || '未知' }}
+                  </template>
+                </el-table-column>
+                <el-table-column label="操作" width="150" fixed="right">
                   <template #default="{ row, $index }">
                     <el-button type="text" size="small" @click="goToTrack($index)">
                       定位
