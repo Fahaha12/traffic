@@ -47,7 +47,7 @@ export function refreshToken(refreshToken: string) {
 // 获取用户信息
 export function getUserInfo() {
   return request<UserInfo>({
-    url: '/user/info',
+    url: '/auth/profile',
     method: 'get',
   });
 }
@@ -91,7 +91,7 @@ export function resetPassword(data: ResetPasswordData) {
 // 获取用户权限列表
 export function getUserPermissions() {
   return request<{ permissions: string[]; roles: string[] }>({
-    url: '/user/permissions',
+    url: '/auth/permissions',
     method: 'get',
   });
 }

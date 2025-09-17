@@ -15,7 +15,7 @@ import time
 from core import db, Camera, Vehicle, VehicleDetection, VehicleAlert, stream_bp, TempFileCleaner
 
 # 导入路由模块
-from routes import auth_bp, system_bp, camera_bp, vehicle_bp, detection_bp
+from routes import auth_bp, system_bp, camera_bp, vehicle_bp, detection_bp, analytics_bp
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -65,6 +65,7 @@ app.register_blueprint(system_bp)
 app.register_blueprint(camera_bp)
 app.register_blueprint(vehicle_bp)
 app.register_blueprint(detection_bp)
+app.register_blueprint(analytics_bp)
 app.register_blueprint(stream_bp)
 
 def start_cleanup_service():

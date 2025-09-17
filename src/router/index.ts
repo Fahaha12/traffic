@@ -166,8 +166,8 @@ router.beforeEach(async (to, from, next) => {
     document.title = `${to.meta.title} - 交通监控系统`
   }
   
-  // 开发模式：跳过认证检查，直接进入主界面
-  if (import.meta.env.DEV) {
+  // 开发模式：可以选择跳过认证检查或使用真实认证
+  if (import.meta.env.DEV && import.meta.env.VITE_SKIP_AUTH === 'true') {
     // 初始化模拟用户数据
     if (!userStore.isAuthenticated) {
       await userStore.initializeMockUser()
@@ -176,8 +176,7 @@ router.beforeEach(async (to, from, next) => {
     return
   }
   
-  // 生产环境的认证检查（暂时注释掉）
-  /*
+  // 真实认证检查
   // 检查是否需要认证
   if (to.meta.requiresAuth) {
     // 检查是否已登录
@@ -192,6 +191,24 @@ router.beforeEach(async (to, from, next) => {
           query: { redirect: to.fullPath }
         })
         return
+      }
+    }
+    
+    // 确保权限已加载
+    if (userStore.permissions.length === 0) {
+      try {
+        await userStore.fetchUserPermissions()
+      } catch (error) {
+        console.error('获取用户权限失败:', error)
+        // 如果权限获取失败，检查是否是admin角色
+        if (!userStore.hasRole('admin')) {
+          ElMessage.error('获取用户权限失败，请重新登录')
+          next({
+            path: '/login',
+            query: { redirect: to.fullPath }
+          })
+          return
+        }
       }
     }
     
@@ -214,7 +231,6 @@ router.beforeEach(async (to, from, next) => {
     next('/dashboard')
     return
   }
-  */
   
   next()
 })

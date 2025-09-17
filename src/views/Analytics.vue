@@ -20,7 +20,7 @@
           </div>
         </div>
         
-        <div class="analytics-stats">
+        <div class="analytics-stats" v-loading="loading">
           <el-row :gutter="20">
             <el-col :span="6">
               <el-card class="stat-card">
@@ -77,7 +77,7 @@
           </el-row>
         </div>
         
-        <div class="analytics-charts">
+        <div class="analytics-charts" v-loading="loading">
           <el-row :gutter="20">
             <el-col :span="12">
               <el-card class="chart-card">
@@ -225,6 +225,7 @@ import {
 import VChart from 'vue-echarts'
 import { useVehicleStore } from '@/stores/vehicle'
 import { useCameraStore } from '@/stores/camera'
+import { analyticsAPI } from '@/api/backend'
 import LayoutHeader from '@/components/Layout/Header.vue'
 import LayoutSidebar from '@/components/Layout/Sidebar.vue'
 import { dateUtils } from '@/utils/dateUtils'
@@ -255,6 +256,7 @@ const totalVehicles = ref(0)
 const suspiciousCount = ref(0)
 const alertCount = ref(0)
 const averageSpeed = ref(0)
+const loading = ref(false)
 
 // 图表配置
 const vehicleTypeChartOption = reactive({
@@ -385,13 +387,9 @@ const suspiciousTrendChartOption = reactive({
 })
 
 // 表格数据
-const recentAlerts = computed(() => vehicleStore.vehicleAlerts.slice(0, 10))
-const cameraStats = computed(() => 
-  cameraStore.cameras.map(camera => ({
-    ...camera,
-    vehicleCount: Math.floor(Math.random() * 100) // 模拟数据
-  }))
-)
+const recentAlerts = ref<any[]>([])
+const cameraStats = ref<any[]>([])
+const dashboardData = ref<any>({})
 
 // 方法
 const handleTimeRangeChange = () => {
@@ -399,9 +397,36 @@ const handleTimeRangeChange = () => {
   refreshAllData()
 }
 
+const loadDashboardData = async () => {
+  try {
+    const response = await analyticsAPI.getDashboardData()
+    dashboardData.value = response.data
+    
+    // 更新统计数据
+    totalVehicles.value = response.data.vehicles?.total || 0
+    suspiciousCount.value = response.data.vehicles?.suspicious || 0
+    alertCount.value = response.data.alerts?.total || 0
+    averageSpeed.value = 0 // 暂时设为0，需要从检测数据计算
+    
+    // 更新最近告警
+    recentAlerts.value = response.data.recentAlerts || []
+    
+    // 更新摄像头统计
+    cameraStats.value = (response.data.recentCameras || []).map((camera: any) => ({
+      ...camera,
+      vehicleCount: Math.floor(Math.random() * 100) // 暂时使用随机数据
+    }))
+  } catch (error) {
+    console.error('获取仪表板数据失败:', error)
+  }
+}
+
 const refreshAllData = async () => {
   try {
-    // 这里调用API获取统计数据
+    loading.value = true
+    // 获取仪表板数据
+    await loadDashboardData()
+    // 获取图表数据
     await Promise.all([
       refreshVehicleTypeChart(),
       refreshTrafficFlowChart(),
@@ -410,37 +435,115 @@ const refreshAllData = async () => {
     ])
   } catch (error) {
     console.error('刷新数据失败:', error)
+  } finally {
+    loading.value = false
   }
 }
 
+// 车辆类型中文映射
+const vehicleTypeMap: Record<string, string> = {
+  'car': '轿车',
+  'truck': '卡车',
+  'bus': '公交车',
+  'motorcycle': '摩托车',
+  'bicycle': '自行车',
+  'unknown': '未知',
+  'suv': 'SUV',
+  'van': '面包车',
+  'taxi': '出租车',
+  'ambulance': '救护车',
+  'fire_truck': '消防车',
+  'police_car': '警车'
+}
+
 const refreshVehicleTypeChart = async () => {
-  // 模拟API调用
-  const data = [
-    { value: 335, name: '轿车' },
-    { value: 310, name: '卡车' },
-    { value: 234, name: '公交车' },
-    { value: 135, name: '摩托车' }
-  ]
-  vehicleTypeChartOption.series[0].data = data
+  try {
+    const response = await analyticsAPI.getVehicleAnalysis()
+    const rawData = response.data.typeStats || []
+    
+    // 将英文字段名转换为中文显示
+    const data = rawData.map((item: any) => ({
+      value: item.value || item.count || 0,
+      name: vehicleTypeMap[item.name] || item.name || '未知'
+    }))
+    
+    vehicleTypeChartOption.series[0].data = data
+  } catch (error) {
+    console.error('获取车辆类型数据失败:', error)
+    // 使用默认数据
+    const data = [
+      { value: 0, name: '轿车' },
+      { value: 0, name: '卡车' },
+      { value: 0, name: '公交车' },
+      { value: 0, name: '摩托车' }
+    ]
+    vehicleTypeChartOption.series[0].data = data
+  }
 }
 
 const refreshTrafficFlowChart = async () => {
-  // 模拟API调用
-  const data = [120, 200, 150, 80, 70, 110, 130, 90, 100, 140, 160, 180]
-  trafficFlowChartOption.series[0].data = data
+  try {
+    const params = {
+      start_time: timeRange.value[0],
+      end_time: timeRange.value[1]
+    }
+    const response = await analyticsAPI.getTrafficFlow(params)
+    const data = response.data.data || []
+    trafficFlowChartOption.series[0].data = data
+    trafficFlowChartOption.xAxis.data = response.data.timeLabels || []
+  } catch (error) {
+    console.error('获取交通流量数据失败:', error)
+    // 使用默认数据
+    const data = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    trafficFlowChartOption.series[0].data = data
+  }
 }
 
 const refreshSuspiciousTrendChart = async () => {
-  // 模拟API调用
-  const suspiciousData = [2, 3, 1, 4, 2, 1, 3]
-  const alertData = [5, 8, 3, 12, 6, 4, 9]
-  suspiciousTrendChartOption.series[0].data = suspiciousData
-  suspiciousTrendChartOption.series[1].data = alertData
+  try {
+    const response = await analyticsAPI.getVehicleAnalysis()
+    const suspiciousTrend = response.data.suspiciousTrend || { dates: [], data: [] }
+    const alertTrend = response.data.alertTrend || { dates: [], data: [] }
+    
+    // 生成最近7天的数据
+    const dates = []
+    const suspiciousData = []
+    const alertData = []
+    
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date()
+      date.setDate(date.getDate() - i)
+      const dateStr = date.toISOString().split('T')[0]
+      dates.push(dateStr)
+      
+      // 查找对应日期的数据
+      const suspiciousIndex = suspiciousTrend.dates?.indexOf(dateStr) || -1
+      const alertIndex = alertTrend.dates?.indexOf(dateStr) || -1
+      
+      suspiciousData.push(suspiciousIndex >= 0 ? suspiciousTrend.data[suspiciousIndex] : 0)
+      alertData.push(alertIndex >= 0 ? alertTrend.data[alertIndex] : 0)
+    }
+    
+    suspiciousTrendChartOption.xAxis.data = dates
+    suspiciousTrendChartOption.series[0].data = suspiciousData
+    suspiciousTrendChartOption.series[1].data = alertData
+  } catch (error) {
+    console.error('获取可疑车辆趋势数据失败:', error)
+    // 使用默认数据
+    const suspiciousData = [0, 0, 0, 0, 0, 0, 0]
+    const alertData = [0, 0, 0, 0, 0, 0, 0]
+    suspiciousTrendChartOption.series[0].data = suspiciousData
+    suspiciousTrendChartOption.series[1].data = alertData
+  }
 }
 
 const refreshCameraStats = async () => {
-  // 模拟API调用
-  console.log('刷新摄像头统计')
+  try {
+    // 摄像头统计已经在loadDashboardData中获取
+    console.log('摄像头统计已更新')
+  } catch (error) {
+    console.error('刷新摄像头统计失败:', error)
+  }
 }
 
 const goToAlerts = () => {

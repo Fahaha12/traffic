@@ -79,9 +79,10 @@ export const useUserStore = defineStore('user', () => {
       return { success: true }
     } catch (error: any) {
       console.error('Login failed:', error)
-      ElMessage.error(error.response?.data?.message || '登录失败，请检查用户名和密码')
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || '登录失败，请检查用户名和密码'
+      ElMessage.error(errorMessage)
       logout()
-      return { success: false, error: error.response?.data?.message || '登录失败' }
+      return { success: false, error: errorMessage }
     } finally {
       isLoading.value = false
     }
@@ -93,6 +94,11 @@ export const useUserStore = defineStore('user', () => {
       const response = await getUserPermissions()
       permissions.value = response.data.permissions
       roles.value = response.data.roles
+      
+      // 存储权限到localStorage
+      localStorage.setItem('permissions', JSON.stringify(permissions.value))
+      localStorage.setItem('roles', JSON.stringify(roles.value))
+      
       return response.data
     } catch (error) {
       console.error('Failed to fetch user permissions:', error)
@@ -148,6 +154,8 @@ export const useUserStore = defineStore('user', () => {
       localStorage.removeItem('token')
       localStorage.removeItem('refreshToken')
       localStorage.removeItem('userInfo')
+      localStorage.removeItem('permissions')
+      localStorage.removeItem('roles')
       localStorage.removeItem('tokenExpireTime')
       
       ElMessage.success('已退出登录')
@@ -159,6 +167,8 @@ export const useUserStore = defineStore('user', () => {
     const savedToken = localStorage.getItem('token')
     const savedRefreshToken = localStorage.getItem('refreshToken')
     const savedUserInfo = localStorage.getItem('userInfo')
+    const savedPermissions = localStorage.getItem('permissions')
+    const savedRoles = localStorage.getItem('roles')
     const tokenExpireTime = localStorage.getItem('tokenExpireTime')
     
     if (savedToken && savedRefreshToken && savedUserInfo) {
@@ -179,7 +189,24 @@ export const useUserStore = defineStore('user', () => {
         refreshTokenValue.value = savedRefreshToken
         userInfo.value = JSON.parse(savedUserInfo)
         isAuthenticated.value = true
-        await fetchUserPermissions()
+        
+        // 恢复权限和角色
+        if (savedPermissions) {
+          permissions.value = JSON.parse(savedPermissions)
+        }
+        if (savedRoles) {
+          roles.value = JSON.parse(savedRoles)
+        }
+        
+        // 如果权限为空，尝试重新获取
+        if (permissions.value.length === 0) {
+          try {
+            await fetchUserPermissions()
+          } catch (error) {
+            console.error('获取用户权限失败:', error)
+            // 即使权限获取失败，也保持登录状态
+          }
+        }
       }
     }
     

@@ -29,16 +29,11 @@ request.interceptors.request.use(
 
 // 响应拦截器
 request.interceptors.response.use(
-  (response: AxiosResponse<ApiResponse>) => {
+  (response: AxiosResponse) => {
     const { data } = response
     
-    // 如果返回的code不是200，显示错误信息
-    if (data.code !== 200) {
-      ElMessage.error(data.message || '请求失败')
-      return Promise.reject(new Error(data.message || '请求失败'))
-    }
-    
-    return data
+    // 直接返回数据，让各个API自己处理响应格式
+    return response
   },
   (error) => {
     console.error('响应错误:', error)

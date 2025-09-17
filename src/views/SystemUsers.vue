@@ -1,296 +1,240 @@
 <template>
   <div class="system-users-view">
     <LayoutHeader />
-    <div class="system-users-content">
+    <div class="users-content">
       <LayoutSidebar />
       <div class="main-content">
-        <div class="system-users-header">
+        <div class="users-header">
           <h1>用户管理</h1>
           <div class="header-actions">
-            <el-button type="primary" @click="showAddUserDialog = true">
+            <el-button type="primary" @click="showCreateDialog">
               <el-icon><Plus /></el-icon>
               添加用户
-            </el-button>
-            <el-button @click="refreshUsers">
-              <el-icon><Refresh /></el-icon>
-              刷新
             </el-button>
           </div>
         </div>
         
-        <div class="system-users-content-wrapper">
-          <!-- 用户筛选 -->
-          <div class="user-filters">
-            <el-card>
-              <el-form :model="filters" inline>
-                <el-form-item label="用户名">
-                  <el-input v-model="filters.username" placeholder="请输入用户名" clearable />
-                </el-form-item>
-                
-                <el-form-item label="角色">
-                  <el-select v-model="filters.role" placeholder="全部角色" clearable>
-                    <el-option label="管理员" value="admin" />
-                    <el-option label="操作员" value="operator" />
-                    <el-option label="查看者" value="viewer" />
-                  </el-select>
-                </el-form-item>
-                
-                <el-form-item label="状态">
-                  <el-select v-model="filters.status" placeholder="全部状态" clearable>
-                    <el-option label="正常" value="active" />
-                    <el-option label="禁用" value="disabled" />
-                    <el-option label="锁定" value="locked" />
-                  </el-select>
-                </el-form-item>
-                
-                <el-form-item>
-                  <el-button type="primary" @click="applyFilters">筛选</el-button>
-                  <el-button @click="resetFilters">重置</el-button>
-                </el-form-item>
-              </el-form>
-            </el-card>
-          </div>
-          
-          <!-- 用户列表 -->
-          <div class="user-list">
-            <el-card>
-              <template #header>
-                <div class="card-header">
-                  <span>用户列表 ({{ totalUsers }} 个)</span>
+        <div class="users-stats">
+          <el-row :gutter="20">
+            <el-col :span="6">
+              <el-card class="stat-card">
+                <div class="stat-content">
+                  <div class="stat-icon total">
+                    <el-icon><User /></el-icon>
+                  </div>
+                  <div class="stat-info">
+                    <div class="stat-number">{{ totalUsers }}</div>
+                    <div class="stat-label">总用户数</div>
+                  </div>
                 </div>
-              </template>
-              
-              <el-table 
-                :data="filteredUsers" 
-                style="width: 100%"
-              >
-                <el-table-column prop="username" label="用户名" width="120" />
-                
-                <el-table-column prop="email" label="邮箱" width="200" />
-                
-                <el-table-column prop="phone" label="手机号" width="130" />
-                
-                <el-table-column prop="role" label="角色" width="100">
-                  <template #default="{ row }">
-                    <el-tag :type="getRoleTagType(row.role)" size="small">
-                      {{ getRoleText(row.role) }}
-                    </el-tag>
-                  </template>
-                </el-table-column>
-                
-                <el-table-column prop="department" label="部门" width="120" />
-                
-                <el-table-column prop="position" label="职位" width="120" />
-                
-                <el-table-column prop="status" label="状态" width="100">
-                  <template #default="{ row }">
-                    <el-tag :type="getStatusTagType(row.status)" size="small">
-                      {{ getStatusText(row.status) }}
-                    </el-tag>
-                  </template>
-                </el-table-column>
-                
-                <el-table-column prop="lastLogin" label="最后登录" width="180">
-                  <template #default="{ row }">
-                    {{ formatTime(row.lastLogin) }}
-                  </template>
-                </el-table-column>
-                
-                <el-table-column prop="createTime" label="创建时间" width="180">
-                  <template #default="{ row }">
-                    {{ formatTime(row.createTime) }}
-                  </template>
-                </el-table-column>
-                
-                <el-table-column label="操作" width="250" fixed="right">
-                  <template #default="{ row }">
-                    <el-button type="text" size="small" @click="editUser(row)">
-                      编辑
-                    </el-button>
-                    <el-button type="text" size="small" @click="resetPassword(row)">
-                      重置密码
-                    </el-button>
-                    <el-button 
-                      type="text" 
-                      size="small" 
-                      @click="toggleUserStatus(row)"
-                      :class="{ 'danger': row.status === 'active' }"
-                    >
-                      {{ row.status === 'active' ? '禁用' : '启用' }}
-                    </el-button>
-                    <el-button 
-                      type="text" 
-                      size="small" 
-                      class="danger"
-                      @click="deleteUser(row)"
-                    >
-                      删除
-                    </el-button>
-                  </template>
-                </el-table-column>
-              </el-table>
-              
-              <!-- 分页 -->
-              <div class="pagination-wrapper">
-                <el-pagination
-                  v-model:current-page="currentPage"
-                  v-model:page-size="pageSize"
-                  :page-sizes="[10, 20, 50, 100]"
-                  :total="totalUsers"
-                  layout="total, sizes, prev, pager, next, jumper"
-                  @size-change="handleSizeChange"
-                  @current-change="handleCurrentChange"
-                />
+              </el-card>
+            </el-col>
+            <el-col :span="6">
+              <el-card class="stat-card">
+                <div class="stat-content">
+                  <div class="stat-icon online">
+                    <el-icon><UserFilled /></el-icon>
+                  </div>
+                  <div class="stat-info">
+                    <div class="stat-number">{{ onlineUsers }}</div>
+                    <div class="stat-label">在线用户</div>
+                  </div>
+                </div>
+              </el-card>
+            </el-col>
+            <el-col :span="6">
+              <el-card class="stat-card">
+                <div class="stat-content">
+                  <div class="stat-icon admin">
+                    <el-icon><Avatar /></el-icon>
+                  </div>
+                  <div class="stat-info">
+                    <div class="stat-number">{{ adminUsers }}</div>
+                    <div class="stat-label">管理员</div>
+                  </div>
+                </div>
+              </el-card>
+            </el-col>
+            <el-col :span="6">
+              <el-card class="stat-card">
+                <div class="stat-content">
+                  <div class="stat-icon operator">
+                    <el-icon><User /></el-icon>
+                  </div>
+                  <div class="stat-info">
+                    <div class="stat-number">{{ operatorUsers }}</div>
+                    <div class="stat-label">操作员</div>
+                  </div>
+                </div>
+              </el-card>
+            </el-col>
+          </el-row>
+        </div>
+        
+        <div class="users-table">
+          <el-card>
+            <template #header>
+              <div class="card-header">
+                <span>用户列表</span>
+                <div class="header-actions">
+                  <el-input
+                    v-model="searchKeyword"
+                    placeholder="搜索用户名、邮箱"
+                    style="width: 300px"
+                    clearable
+                    @input="handleSearch"
+                  >
+                    <template #prefix>
+                      <el-icon><Search /></el-icon>
+                    </template>
+                  </el-input>
+                </div>
               </div>
-            </el-card>
-          </div>
+            </template>
+            
+            <el-table 
+              :data="filteredUsers" 
+              style="width: 100%"
+              v-loading="loading"
+            >
+              <el-table-column prop="username" label="用户名" width="150" />
+              <el-table-column prop="email" label="邮箱" width="200" />
+              <el-table-column prop="phone" label="手机号" width="150" />
+              <el-table-column prop="role" label="角色" width="120">
+                <template #default="{ row }">
+                  <el-tag :type="getRoleType(row.role)" size="small">
+                    {{ getRoleText(row.role) }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="department" label="部门" width="120" />
+              <el-table-column prop="position" label="职位" width="120" />
+              <el-table-column prop="lastLoginTime" label="最后登录" width="180">
+                <template #default="{ row }">
+                  {{ formatTime(row.lastLoginTime) }}
+                </template>
+              </el-table-column>
+              <el-table-column prop="createTime" label="创建时间" width="180">
+                <template #default="{ row }">
+                  {{ formatTime(row.createTime) }}
+                </template>
+              </el-table-column>
+              <el-table-column label="操作" width="200" fixed="right">
+                <template #default="{ row }">
+                  <el-button type="text" size="small" @click="editUser(row)">
+                    编辑
+                  </el-button>
+                  <el-button type="text" size="small" @click="resetPassword(row)">
+                    重置密码
+                  </el-button>
+                  <el-button 
+                    type="text" 
+                    size="small" 
+                    @click="deleteUser(row)"
+                    v-if="row.id !== currentUser?.id"
+                  >
+                    删除
+                  </el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-card>
         </div>
       </div>
     </div>
     
-    <!-- 添加/编辑用户对话框 -->
+    <!-- 创建/编辑用户对话框 -->
     <el-dialog
-      v-model="showAddUserDialog"
+      v-model="dialogVisible"
       :title="isEdit ? '编辑用户' : '添加用户'"
       width="600px"
+      @close="resetForm"
     >
-      <el-form :model="userForm" :rules="userRules" ref="userFormRef" label-width="80px">
+      <el-form
+        ref="formRef"
+        :model="formData"
+        :rules="formRules"
+        label-width="100px"
+      >
         <el-form-item label="用户名" prop="username">
-          <el-input v-model="userForm.username" :disabled="isEdit" />
+          <el-input v-model="formData.username" :disabled="isEdit" />
         </el-form-item>
-        
         <el-form-item label="邮箱" prop="email">
-          <el-input v-model="userForm.email" />
+          <el-input v-model="formData.email" />
         </el-form-item>
-        
         <el-form-item label="手机号" prop="phone">
-          <el-input v-model="userForm.phone" />
+          <el-input v-model="formData.phone" />
         </el-form-item>
-        
-        <el-form-item label="密码" prop="password" v-if="!isEdit">
-          <el-input v-model="userForm.password" type="password" />
-        </el-form-item>
-        
         <el-form-item label="角色" prop="role">
-          <el-select v-model="userForm.role" style="width: 100%">
+          <el-select v-model="formData.role" style="width: 100%">
             <el-option label="管理员" value="admin" />
             <el-option label="操作员" value="operator" />
-            <el-option label="查看者" value="viewer" />
           </el-select>
         </el-form-item>
-        
         <el-form-item label="部门" prop="department">
-          <el-input v-model="userForm.department" />
+          <el-input v-model="formData.department" />
         </el-form-item>
-        
         <el-form-item label="职位" prop="position">
-          <el-input v-model="userForm.position" />
+          <el-input v-model="formData.position" />
         </el-form-item>
-        
-        <el-form-item label="状态" prop="status">
-          <el-select v-model="userForm.status" style="width: 100%">
-            <el-option label="正常" value="active" />
-            <el-option label="禁用" value="disabled" />
-            <el-option label="锁定" value="locked" />
-          </el-select>
+        <el-form-item label="密码" prop="password" v-if="!isEdit">
+          <el-input v-model="formData.password" type="password" show-password />
         </el-form-item>
       </el-form>
       
       <template #footer>
-        <el-button @click="showAddUserDialog = false">取消</el-button>
-        <el-button type="primary" @click="saveUser">确定</el-button>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitForm" :loading="formLoading">
+          {{ isEdit ? '更新' : '创建' }}
+        </el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
-import { useUserStore } from '@/stores/user'
+import { ref, computed, onMounted, reactive } from 'vue'
+import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+import { Plus, User, UserFilled, Avatar, Search } from '@element-plus/icons-vue'
 import LayoutHeader from '@/components/Layout/Header.vue'
 import LayoutSidebar from '@/components/Layout/Sidebar.vue'
+import { useUserStore } from '@/stores/user'
 import { dateUtils } from '@/utils/dateUtils'
-import { ElMessage, ElMessageBox } from 'element-plus'
 
 const userStore = useUserStore()
 
 // 响应式数据
-const users = ref([
-  {
-    id: '1',
-    username: 'admin',
-    email: 'admin@traffic-monitor.com',
-    phone: '13800138000',
-    role: 'admin',
-    department: '技术部',
-    position: '系统管理员',
-    status: 'active',
-    lastLogin: new Date().toISOString(),
-    createTime: new Date(Date.now() - 86400000 * 30).toISOString()
-  },
-  {
-    id: '2',
-    username: 'operator1',
-    email: 'operator1@traffic-monitor.com',
-    phone: '13800138001',
-    role: 'operator',
-    department: '运营部',
-    position: '操作员',
-    status: 'active',
-    lastLogin: new Date(Date.now() - 3600000).toISOString(),
-    createTime: new Date(Date.now() - 86400000 * 15).toISOString()
-  },
-  {
-    id: '3',
-    username: 'viewer1',
-    email: 'viewer1@traffic-monitor.com',
-    phone: '13800138002',
-    role: 'viewer',
-    department: '监控部',
-    position: '监控员',
-    status: 'active',
-    lastLogin: new Date(Date.now() - 7200000).toISOString(),
-    createTime: new Date(Date.now() - 86400000 * 7).toISOString()
-  },
-  {
-    id: '4',
-    username: 'test_user',
-    email: 'test@traffic-monitor.com',
-    phone: '13800138003',
-    role: 'viewer',
-    department: '测试部',
-    position: '测试员',
-    status: 'disabled',
-    lastLogin: new Date(Date.now() - 86400000 * 3).toISOString(),
-    createTime: new Date(Date.now() - 86400000 * 2).toISOString()
-  }
-])
-
-const filters = reactive({
-  username: '',
-  role: '',
-  status: ''
-})
-
-const currentPage = ref(1)
-const pageSize = ref(20)
-const showAddUserDialog = ref(false)
+const loading = ref(false)
+const searchKeyword = ref('')
+const dialogVisible = ref(false)
 const isEdit = ref(false)
-const userFormRef = ref()
+const formLoading = ref(false)
+const formRef = ref<FormInstance>()
 
-const userForm = reactive({
+// 统计数据
+const totalUsers = ref(0)
+const onlineUsers = ref(0)
+const adminUsers = ref(0)
+const operatorUsers = ref(0)
+
+// 用户列表
+const users = ref<any[]>([])
+const currentUser = computed(() => userStore.userInfo)
+
+// 表单数据
+const formData = reactive({
   id: '',
   username: '',
   email: '',
   phone: '',
-  password: '',
-  role: 'viewer',
+  role: 'operator',
   department: '',
   position: '',
-  status: 'active'
+  password: ''
 })
 
-const userRules = {
+// 表单验证规则
+const formRules: FormRules = {
   username: [
     { required: true, message: '请输入用户名', trigger: 'blur' },
     { min: 3, max: 20, message: '用户名长度在 3 到 20 个字符', trigger: 'blur' }
@@ -303,10 +247,6 @@ const userRules = {
     { required: true, message: '请输入手机号', trigger: 'blur' },
     { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }
   ],
-  password: [
-    { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, max: 20, message: '密码长度在 6 到 20 个字符', trigger: 'blur' }
-  ],
   role: [
     { required: true, message: '请选择角色', trigger: 'change' }
   ],
@@ -315,196 +255,187 @@ const userRules = {
   ],
   position: [
     { required: true, message: '请输入职位', trigger: 'blur' }
+  ],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, max: 20, message: '密码长度在 6 到 20 个字符', trigger: 'blur' }
   ]
 }
 
 // 计算属性
-const totalUsers = computed(() => filteredUsers.value.length)
-
 const filteredUsers = computed(() => {
-  let result = users.value
+  if (!searchKeyword.value) return users.value
   
-  if (filters.username) {
-    result = result.filter(user => 
-      user.username.toLowerCase().includes(filters.username.toLowerCase())
-    )
-  }
-  
-  if (filters.role) {
-    result = result.filter(user => user.role === filters.role)
-  }
-  
-  if (filters.status) {
-    result = result.filter(user => user.status === filters.status)
-  }
-  
-  return result
+  const keyword = searchKeyword.value.toLowerCase()
+  return users.value.filter(user => 
+    user.username.toLowerCase().includes(keyword) ||
+    user.email.toLowerCase().includes(keyword)
+  )
 })
 
 // 方法
-const getRoleText = (role: string) => {
-  const roleMap: Record<string, string> = {
-    admin: '管理员',
-    operator: '操作员',
-    viewer: '查看者'
+const loadUsers = async () => {
+  try {
+    loading.value = true
+    // 模拟数据，实际应该调用API
+    users.value = [
+      {
+        id: 1,
+        username: 'admin',
+        email: 'admin@traffic-monitor.com',
+        phone: '13800138000',
+        role: 'admin',
+        department: '技术部',
+        position: '系统管理员',
+        lastLoginTime: '2024-01-15T10:30:00Z',
+        createTime: '2024-01-01T00:00:00Z'
+      },
+      {
+        id: 2,
+        username: 'operator',
+        email: 'operator@traffic-monitor.com',
+        phone: '13800138001',
+        role: 'operator',
+        department: '运营部',
+        position: '操作员',
+        lastLoginTime: '2024-01-15T09:15:00Z',
+        createTime: '2024-01-01T00:00:00Z'
+      }
+    ]
+    
+    // 更新统计数据
+    totalUsers.value = users.value.length
+    onlineUsers.value = users.value.filter(u => u.lastLoginTime).length
+    adminUsers.value = users.value.filter(u => u.role === 'admin').length
+    operatorUsers.value = users.value.filter(u => u.role === 'operator').length
+  } catch (error) {
+    console.error('加载用户列表失败:', error)
+    ElMessage.error('加载用户列表失败')
+  } finally {
+    loading.value = false
   }
-  return roleMap[role] || role
 }
 
-const getRoleTagType = (role: string) => {
-  const typeMap: Record<string, string> = {
-    admin: 'danger',
-    operator: 'warning',
-    viewer: 'info'
-  }
-  return typeMap[role] || 'info'
-}
-
-const getStatusText = (status: string) => {
-  const statusMap: Record<string, string> = {
-    active: '正常',
-    disabled: '禁用',
-    locked: '锁定'
-  }
-  return statusMap[status] || status
-}
-
-const getStatusTagType = (status: string) => {
-  const typeMap: Record<string, string> = {
-    active: 'success',
-    disabled: 'info',
-    locked: 'danger'
-  }
-  return typeMap[status] || 'info'
-}
-
-const formatTime = (timestamp: string) => {
-  return dateUtils.formatDateTime(timestamp)
-}
-
-const applyFilters = () => {
-  currentPage.value = 1
-  ElMessage.success('筛选条件已应用')
-}
-
-const resetFilters = () => {
-  Object.assign(filters, {
-    username: '',
-    role: '',
-    status: ''
-  })
-  currentPage.value = 1
-  ElMessage.success('筛选条件已重置')
-}
-
-const refreshUsers = () => {
-  ElMessage.success('用户列表已刷新')
+const showCreateDialog = () => {
+  isEdit.value = false
+  dialogVisible.value = true
+  resetForm()
 }
 
 const editUser = (user: any) => {
   isEdit.value = true
-  Object.assign(userForm, user)
-  showAddUserDialog.value = true
+  dialogVisible.value = true
+  Object.assign(formData, user)
 }
 
-const saveUser = async () => {
-  try {
-    await userFormRef.value.validate()
-    
-    if (isEdit.value) {
-      // 编辑用户
-      const index = users.value.findIndex(u => u.id === userForm.id)
-      if (index > -1) {
-        users.value[index] = { ...users.value[index], ...userForm }
-        ElMessage.success('用户信息已更新')
-      }
-    } else {
-      // 添加用户
-      const newUser = {
-        ...userForm,
-        id: Date.now().toString(),
-        lastLogin: new Date().toISOString(),
-        createTime: new Date().toISOString()
-      }
-      users.value.push(newUser)
-      ElMessage.success('用户添加成功')
-    }
-    
-    showAddUserDialog.value = false
-    resetUserForm()
-  } catch (error) {
-    console.error('表单验证失败:', error)
+const resetForm = () => {
+  if (formRef.value) {
+    formRef.value.resetFields()
   }
-}
-
-const resetUserForm = () => {
-  Object.assign(userForm, {
+  Object.assign(formData, {
     id: '',
     username: '',
     email: '',
     phone: '',
-    password: '',
-    role: 'viewer',
+    role: 'operator',
     department: '',
     position: '',
-    status: 'active'
+    password: ''
   })
-  isEdit.value = false
+}
+
+const submitForm = async () => {
+  if (!formRef.value) return
+  
+  try {
+    await formRef.value.validate()
+    formLoading.value = true
+    
+    // 模拟API调用
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    if (isEdit.value) {
+      ElMessage.success('用户更新成功')
+    } else {
+      ElMessage.success('用户创建成功')
+    }
+    
+    dialogVisible.value = false
+    loadUsers()
+  } catch (error) {
+    console.error('提交表单失败:', error)
+  } finally {
+    formLoading.value = false
+  }
 }
 
 const resetPassword = async (user: any) => {
   try {
-    await ElMessageBox.confirm('确定要重置该用户的密码吗？', '确认重置', {
-      type: 'warning'
-    })
+    await ElMessageBox.confirm(
+      `确定要重置用户 ${user.username} 的密码吗？`,
+      '重置密码',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
     
+    // 模拟API调用
+    await new Promise(resolve => setTimeout(resolve, 1000))
     ElMessage.success('密码重置成功，新密码已发送到用户邮箱')
-  } catch {
-    // 用户取消重置
-  }
-}
-
-const toggleUserStatus = async (user: any) => {
-  const action = user.status === 'active' ? '禁用' : '启用'
-  try {
-    await ElMessageBox.confirm(`确定要${action}该用户吗？`, `确认${action}`, {
-      type: 'warning'
-    })
-    
-    user.status = user.status === 'active' ? 'disabled' : 'active'
-    ElMessage.success(`用户已${action}`)
-  } catch {
-    // 用户取消操作
+  } catch (error) {
+    // 用户取消
   }
 }
 
 const deleteUser = async (user: any) => {
   try {
-    await ElMessageBox.confirm('确定要删除该用户吗？此操作不可恢复！', '确认删除', {
-      type: 'warning'
-    })
+    await ElMessageBox.confirm(
+      `确定要删除用户 ${user.username} 吗？此操作不可恢复！`,
+      '删除用户',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
     
-    const index = users.value.findIndex(u => u.id === user.id)
-    if (index > -1) {
-      users.value.splice(index, 1)
-      ElMessage.success('用户删除成功')
-    }
-  } catch {
-    // 用户取消删除
+    // 模拟API调用
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    ElMessage.success('用户删除成功')
+    loadUsers()
+  } catch (error) {
+    // 用户取消
   }
 }
 
-const handleSizeChange = (size: number) => {
-  pageSize.value = size
-  currentPage.value = 1
+const handleSearch = () => {
+  // 搜索逻辑在computed中处理
 }
 
-const handleCurrentChange = (page: number) => {
-  currentPage.value = page
+const getRoleType = (role: string) => {
+  switch (role) {
+    case 'admin': return 'danger'
+    case 'operator': return 'primary'
+    default: return 'info'
+  }
+}
+
+const getRoleText = (role: string) => {
+  switch (role) {
+    case 'admin': return '管理员'
+    case 'operator': return '操作员'
+    default: return '未知'
+  }
+}
+
+const formatTime = (timestamp: string) => {
+  return dateUtils.formatTime(timestamp)
 }
 
 onMounted(() => {
-  // 初始化数据
+  loadUsers()
 })
 </script>
 
@@ -515,7 +446,7 @@ onMounted(() => {
   flex-direction: column;
 }
 
-.system-users-content {
+.users-content {
   flex: 1;
   display: flex;
   overflow: hidden;
@@ -528,33 +459,79 @@ onMounted(() => {
   background: var(--bg-color);
 }
 
-.system-users-header {
+.users-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
 }
 
-.system-users-header h1 {
+.users-header h1 {
   color: var(--text-color);
   margin: 0;
 }
 
-.header-actions {
+.users-stats {
+  margin-bottom: 20px;
+}
+
+.stat-card {
+  background: var(--bg-color-light);
+  border: 1px solid var(--border-color);
+}
+
+.stat-content {
   display: flex;
-  gap: 10px;
+  align-items: center;
+  gap: 15px;
 }
 
-.system-users-content-wrapper {
-  max-width: 1400px;
+.stat-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  color: white;
 }
 
-.user-filters {
-  margin-bottom: 20px;
+.stat-icon.total {
+  background: var(--primary-color);
 }
 
-.user-list {
-  margin-bottom: 20px;
+.stat-icon.online {
+  background: var(--success-color);
+}
+
+.stat-icon.admin {
+  background: var(--danger-color);
+}
+
+.stat-icon.operator {
+  background: var(--warning-color);
+}
+
+.stat-info {
+  flex: 1;
+}
+
+.stat-number {
+  font-size: 28px;
+  font-weight: bold;
+  color: var(--text-color);
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: var(--text-color-light);
+  margin-top: 5px;
+}
+
+.users-table {
+  margin-top: 20px;
 }
 
 .card-header {
@@ -563,46 +540,21 @@ onMounted(() => {
   align-items: center;
 }
 
-.pagination-wrapper {
-  margin-top: 20px;
+.header-actions {
   display: flex;
-  justify-content: center;
+  gap: 10px;
+  align-items: center;
 }
 
-.danger {
-  color: var(--danger-color);
+:deep(.el-table) {
+  font-size: 14px;
 }
 
 :deep(.el-table th),
 :deep(.el-table td) {
-  background: var(--bg-color-light);
-  border-color: var(--border-color);
-  color: var(--text-color);
-}
-
-:deep(.el-table__header-wrapper) {
-  background: var(--bg-color-light);
-}
-
-:deep(.el-card) {
-  background: var(--bg-color-light);
-  border: 1px solid var(--border-color);
-}
-
-:deep(.el-card__header) {
-  background: var(--bg-color-lighter);
-  border-bottom: 1px solid var(--border-color);
-  color: var(--text-color);
-}
-
-:deep(.el-form-item__label) {
-  color: var(--text-color);
-}
-
-:deep(.el-input__inner),
-:deep(.el-select .el-input__inner) {
-  background: var(--bg-color);
-  border-color: var(--border-color);
-  color: var(--text-color);
+  padding: 8px 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>
